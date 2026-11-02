@@ -5,10 +5,10 @@ plugins {
 }
 
 android {
-  namespace = "com.example.pixelclock"
+  namespace = "io.github.mikhasrahulia.pixelclock"
   compileSdk = 36
   defaultConfig {
-    applicationId = "com.example.pixelclock"
+    applicationId = "io.github.mikhasrahulia.pixelclock"
     minSdk = 26
     targetSdk = 35
     versionCode = 1

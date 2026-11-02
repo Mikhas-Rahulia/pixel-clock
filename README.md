@@ -4,9 +4,9 @@ A light, Material 3 Expressive alarm clock and timer for Android.
 
 The one thing that pushed me to build it: **an alarm that repeats every 2 weeks** (lectures on alternate weeks). Most clock apps can only repeat weekly or daily, so I made one that can.
 
-![Every 2 weeks alarms](docs/screenshots/01-every-2-weeks.png) ![Repeat settings](docs/screenshots/02-customize-biweekly.png) ![Two-week calendar](docs/screenshots/03-two-week-calendar.png)
+<img src="docs/linkedin-post-image.png" alt="Every 2 weeks alarms: alarm list sorted by time of day and the biweekly editor" width="480">
 
-*Screenshots are design mockups rendered with the app's colour scheme and layout, not captures of a real device.*
+More: [alarm list](docs/screenshots/01-every-2-weeks-list.png), [biweekly editor](docs/screenshots/02-biweekly-editor.png).
 
 ## Features
 

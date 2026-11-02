@@ -13,11 +13,11 @@
 }
 
 # Keep Services and BroadcastReceivers
--keep class com.example.pixelclock.alarm.AlarmReceiver { *; }
--keep class com.example.pixelclock.alarm.AlarmService { *; }
--keep class com.example.pixelclock.alarm.BootReceiver { *; }
--keep class com.example.pixelclock.timer.TimerService { *; }
--keep class com.example.pixelclock.timer.TimerReceiver { *; }
--keep class com.example.pixelclock.timer.TimerRingingActivity { *; }
--keep class com.example.pixelclock.alarm.AlarmRingingActivity { *; }
--keep class com.example.pixelclock.MainActivity { *; }
+-keep class io.github.mikhasrahulia.pixelclock.alarm.AlarmReceiver { *; }
+-keep class io.github.mikhasrahulia.pixelclock.alarm.AlarmService { *; }
+-keep class io.github.mikhasrahulia.pixelclock.alarm.BootReceiver { *; }
+-keep class io.github.mikhasrahulia.pixelclock.timer.TimerService { *; }
+-keep class io.github.mikhasrahulia.pixelclock.timer.TimerReceiver { *; }
+-keep class io.github.mikhasrahulia.pixelclock.timer.TimerRingingActivity { *; }
+-keep class io.github.mikhasrahulia.pixelclock.alarm.AlarmRingingActivity { *; }
+-keep class io.github.mikhasrahulia.pixelclock.MainActivity { *; }

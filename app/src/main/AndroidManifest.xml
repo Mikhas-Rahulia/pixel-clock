@@ -57,9 +57,9 @@
             android:name=".alarm.AlarmReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.example.pixelclock.ACTION_ALARM_FIRE" />
-                <action android:name="com.example.pixelclock.ACTION_ALARM_DISMISS" />
-                <action android:name="com.example.pixelclock.ACTION_ALARM_SNOOZE" />
+                <action android:name="io.github.mikhasrahulia.pixelclock.ACTION_ALARM_FIRE" />
+                <action android:name="io.github.mikhasrahulia.pixelclock.ACTION_ALARM_DISMISS" />
+                <action android:name="io.github.mikhasrahulia.pixelclock.ACTION_ALARM_SNOOZE" />
             </intent-filter>
         </receiver>
 
@@ -68,7 +68,7 @@
             android:directBootAware="true"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.example.pixelclock.ACTION_TIMER_FIRE" />
+                <action android:name="io.github.mikhasrahulia.pixelclock.ACTION_TIMER_FIRE" />
             </intent-filter>
         </receiver>
 

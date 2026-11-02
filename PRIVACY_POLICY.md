@@ -2,7 +2,7 @@
 
 Ostatnia aktualizacja / Last updated: 2026-11-02
 
-Aplikacja **Clock** (`com.example.pixelclock`) — dalej „Aplikacja”.
+Aplikacja **Clock** (`io.github.mikhasrahulia.pixelclock`) — dalej „Aplikacja”.
 
 ---
 
@@ -45,7 +45,7 @@ Zmiany tej polityki będą publikowane w tym pliku z nową datą aktualizacji.
 
 ## 2. English
 
-The app **Clock** (`com.example.pixelclock`) is free and open source.
+The app **Clock** (`io.github.mikhasrahulia.pixelclock`) is free and open source.
 
 - **No personal data is collected, sent or shared.** The author receives nothing from your phone.
 - Alarms, timers and their run history are stored **only on your device**, in the app's private storage.
