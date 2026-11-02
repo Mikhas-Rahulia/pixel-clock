@@ -1,0 +1,67 @@
+<resources>
+    <string name="app_name">Zegar</string>
+    <string name="tab_alarm">Budzik</string>
+    <string name="tab_timer">Minutnik</string>
+    <string name="add_alarm">Dodaj budzik</string>
+    <string name="no_alarms">Brak budzików</string>
+    <string name="snooze">Drzemka (+10m)</string>
+    <string name="dismiss">Wyłącz</string>
+    <string name="stop">Stop</string>
+    <string name="pause">Pauza</string>
+    <string name="resume">Start</string>
+    <string name="reset">Reset</string>
+    <string name="add_one_min">+1:00</string>
+    <string name="add_five_min">+5:00</string>
+    <string name="plus_5_min">+5 min</string>
+    <string name="repeat_weekly">Co tydzień</string>
+    <string name="repeat_biweekly">Co 2 tygodnie</string>
+    <string name="shift_cycle">Przesuń o 1 tydz. ⇄</string>
+    <string name="active_this_week">Aktywny w tym tygodniu</string>
+    <string name="active_next_week">Aktywny w przyszłym tygodniu</string>
+    <string name="weekdays">Dni robocze</string>
+    <string name="weekends">Weekendy</string>
+    <string name="every_day">Codziennie</string>
+    <string name="once">Raz</string>
+    <string name="vibration">Wibracje</string>
+    <string name="label">Etykieta</string>
+    <string name="alarm_label_placeholder">Nazwa budzika</string>
+    <string name="delete">Usuń</string>
+    <string name="save">Zapisz</string>
+    <string name="cancel">Anuluj</string>
+    <string name="time_up">Koniec czasu!</string>
+    <string name="timer_running">Minutnik działa</string>
+    <string name="add_timer">Dodaj</string>
+    <string name="select_time">Wybierz godzinę</string>
+    <string name="alarm_ringing">Budzik dzwoni</string>
+
+    <string name="day_mon">Pn</string>
+    <string name="day_tue">Wt</string>
+    <string name="day_wed">Śr</string>
+    <string name="day_thu">Czw</string>
+    <string name="day_fri">Pt</string>
+    <string name="day_sat">Sob</string>
+    <string name="day_sun">Niedz</string>
+
+    <string name="hours_unit">godz.</string>
+    <string name="mins_unit">min</string>
+    <string name="secs_unit">s</string>
+
+    <string name="select_date">Wybierz datę</string>
+    <string name="clear_date">Wyczyść datę</string>
+    <string name="specific_date">Data</string>
+    <string name="repeat_days">Powtórz</string>
+    <string name="timer_name_hint">Nazwa minutnika (opcjonalnie)</string>
+    <string name="alarm_name_hint">Nazwa budzika (opcjonalnie)</string>
+    <string name="chip_tea">Herbata</string>
+    <string name="chip_cooking">Gotowanie</string>
+    <string name="chip_workout">Trening</string>
+    <string name="chip_nap">Drzemka</string>
+    <string name="chip_laundry">Pranie</string>
+    <string name="chip_work">Praca</string>
+    <string name="chip_medicine">Leki</string>
+    <string name="snooze_five">Odłóż o 5 min</string>
+    <string name="stop_timer">Zatrzymaj</string>
+    <string name="timer_hour_stat">%1$d min · %2$d×</string>
+    <string name="timer_alert_channel">Koniec timera</string>
+    <string name="customize">Dostosuj</string>
+</resources>

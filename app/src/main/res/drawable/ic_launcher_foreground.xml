@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Clock outer dial -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFD8B79B"
+        android:strokeWidth="5"
+        android:pathData="M54,26 A28,28 0 1,1 53.99,26 Z"/>
+    <!-- Hour hand (at 10 o'clock) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M54,54 L42,40"/>
+    <!-- Minute hand (at 2 o'clock) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M54,54 L68,34"/>
+    <!-- Center pivot -->
+    <path
+        android:fillColor="#FFD8B79B"
+        android:pathData="M54,51 A3,3 0 1,1 53.99,51 Z"/>
+</vector>

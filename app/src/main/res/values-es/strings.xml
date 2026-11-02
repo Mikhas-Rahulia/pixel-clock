@@ -1,0 +1,67 @@
+<resources>
+    <string name="app_name">Reloj</string>
+    <string name="tab_alarm">Alarma</string>
+    <string name="tab_timer">Temporizador</string>
+    <string name="add_alarm">Añadir alarma</string>
+    <string name="no_alarms">No hay alarmas</string>
+    <string name="snooze">Posponer (+10 min)</string>
+    <string name="dismiss">Descartar</string>
+    <string name="stop">Detener</string>
+    <string name="pause">Pausar</string>
+    <string name="resume">Iniciar</string>
+    <string name="reset">Reiniciar</string>
+    <string name="add_one_min">+1:00</string>
+    <string name="add_five_min">+5:00</string>
+    <string name="plus_5_min">+5 min</string>
+    <string name="repeat_weekly">Semanal</string>
+    <string name="repeat_biweekly">Cada 2 semanas</string>
+    <string name="shift_cycle">Mover 1 sem. ⇄</string>
+    <string name="active_this_week">Activa esta semana</string>
+    <string name="active_next_week">Activa próxima semana</string>
+    <string name="weekdays">Entre semana</string>
+    <string name="weekends">Fines de semana</string>
+    <string name="every_day">Todos los días</string>
+    <string name="once">Una vez</string>
+    <string name="vibration">Vibración</string>
+    <string name="label">Etiqueta</string>
+    <string name="alarm_label_placeholder">Nombre de alarma</string>
+    <string name="delete">Eliminar</string>
+    <string name="save">Guardar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="time_up">¡Tiempo agotado!</string>
+    <string name="timer_running">Temporizador en marcha</string>
+    <string name="add_timer">Añadir</string>
+    <string name="select_time">Seleccionar hora</string>
+    <string name="alarm_ringing">Alarma sonando</string>
+
+    <string name="day_mon">Lun</string>
+    <string name="day_tue">Mar</string>
+    <string name="day_wed">Mié</string>
+    <string name="day_thu">Jue</string>
+    <string name="day_fri">Vie</string>
+    <string name="day_sat">Sáb</string>
+    <string name="day_sun">Dom</string>
+
+    <string name="hours_unit">h</string>
+    <string name="mins_unit">m</string>
+    <string name="secs_unit">s</string>
+
+    <string name="select_date">Seleccionar fecha</string>
+    <string name="clear_date">Borrar fecha</string>
+    <string name="specific_date">Fecha</string>
+    <string name="repeat_days">Repetir</string>
+    <string name="timer_name_hint">Nombre de temporizador (opcional)</string>
+    <string name="alarm_name_hint">Nombre de alarma (opcional)</string>
+    <string name="chip_tea">Té</string>
+    <string name="chip_cooking">Cocina</string>
+    <string name="chip_workout">Entreno</string>
+    <string name="chip_nap">Siesta</string>
+    <string name="chip_laundry">Lavadora</string>
+    <string name="chip_work">Trabajo</string>
+    <string name="chip_medicine">Medicina</string>
+    <string name="snooze_five">Posponer 5 min</string>
+    <string name="stop_timer">Detener</string>
+    <string name="timer_hour_stat">%1$d min · %2$d×</string>
+    <string name="timer_alert_channel">Temporizador</string>
+    <string name="customize">Personalizar</string>
+</resources>

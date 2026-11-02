@@ -1,0 +1,67 @@
+<resources>
+    <string name="app_name">Гадзіннік</string>
+    <string name="tab_alarm">Будзільнік</string>
+    <string name="tab_timer">Таймер</string>
+    <string name="add_alarm">Новы будзільнік</string>
+    <string name="no_alarms">Няма будзільнікаў</string>
+    <string name="snooze">Адкласці (+10хв)</string>
+    <string name="dismiss">Адхіліць</string>
+    <string name="stop">Спыніць</string>
+    <string name="pause">Паўза</string>
+    <string name="resume">Старт</string>
+    <string name="reset">Скінуць</string>
+    <string name="add_one_min">+1:00</string>
+    <string name="add_five_min">+5:00</string>
+    <string name="plus_5_min">+5 хв</string>
+    <string name="repeat_weekly">Штотыдзень</string>
+    <string name="repeat_biweekly">Раз у 2 тыдні</string>
+    <string name="shift_cycle">Зрух на 1 тыдзень ⇄</string>
+    <string name="active_this_week">Актыўны на гэтым тыдні</string>
+    <string name="active_next_week">Актыўны на наступным тыдні</string>
+    <string name="weekdays">Будні</string>
+    <string name="weekends">Выхадныя</string>
+    <string name="every_day">Кожны дзень</string>
+    <string name="once">Аднойчы</string>
+    <string name="vibration">Вібрацыя</string>
+    <string name="label">Назва</string>
+    <string name="alarm_label_placeholder">Назва будзільніка</string>
+    <string name="delete">Выдаліць</string>
+    <string name="save">Захаваць</string>
+    <string name="cancel">Адмена</string>
+    <string name="time_up">Час скончыўся!</string>
+    <string name="timer_running">Таймер працуе</string>
+    <string name="add_timer">Дадаць</string>
+    <string name="select_time">Выбраць час</string>
+    <string name="alarm_ringing">Будзільнік звоніць</string>
+
+    <string name="day_mon">Пн</string>
+    <string name="day_tue">Аў</string>
+    <string name="day_wed">Ср</string>
+    <string name="day_thu">Чц</string>
+    <string name="day_fri">Пт</string>
+    <string name="day_sat">Сб</string>
+    <string name="day_sun">Нд</string>
+
+    <string name="hours_unit">г</string>
+    <string name="mins_unit">хв</string>
+    <string name="secs_unit">с</string>
+
+    <string name="select_date">Выбраць дату</string>
+    <string name="clear_date">Скінуць дату</string>
+    <string name="specific_date">Дата</string>
+    <string name="repeat_days">Паўтор</string>
+    <string name="timer_name_hint">Назва таймера (неабавязкова)</string>
+    <string name="alarm_name_hint">Назва будзільніка (неабавязкова)</string>
+    <string name="chip_tea">Гарбата</string>
+    <string name="chip_cooking">Варка</string>
+    <string name="chip_workout">Трэніроўка</string>
+    <string name="chip_nap">Сон</string>
+    <string name="chip_laundry">Пралле</string>
+    <string name="chip_work">Праца</string>
+    <string name="chip_medicine">Лекі</string>
+    <string name="snooze_five">Адкласці на 5 хв</string>
+    <string name="stop_timer">Спыніць</string>
+    <string name="timer_hour_stat">%1$d хв · %2$d×</string>
+    <string name="timer_alert_channel">Таймер скончыўся</string>
+    <string name="customize">Наладзіць</string>
+</resources>

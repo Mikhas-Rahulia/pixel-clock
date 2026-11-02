@@ -1,0 +1,67 @@
+<resources>
+    <string name="app_name">Clock</string>
+    <string name="tab_alarm">Alarm</string>
+    <string name="tab_timer">Timer</string>
+    <string name="add_alarm">Add alarm</string>
+    <string name="no_alarms">No alarms</string>
+    <string name="snooze">Snooze (+10m)</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="stop">Stop</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Start</string>
+    <string name="reset">Reset</string>
+    <string name="add_one_min">+1:00</string>
+    <string name="add_five_min">+5:00</string>
+    <string name="plus_5_min">+5 min</string>
+    <string name="repeat_weekly">Weekly</string>
+    <string name="repeat_biweekly">Every 2 weeks</string>
+    <string name="shift_cycle">Shift 1 week ⇄</string>
+    <string name="active_this_week">Active this week</string>
+    <string name="active_next_week">Active next week</string>
+    <string name="weekdays">Weekdays</string>
+    <string name="weekends">Weekends</string>
+    <string name="every_day">Every day</string>
+    <string name="once">Once</string>
+    <string name="vibration">Vibrate</string>
+    <string name="label">Label</string>
+    <string name="alarm_label_placeholder">Alarm label</string>
+    <string name="delete">Delete</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="time_up">Time’s up!</string>
+    <string name="timer_running">Timer running</string>
+    <string name="add_timer">Add</string>
+    <string name="select_time">Select time</string>
+    <string name="alarm_ringing">Alarm ringing</string>
+
+    <string name="day_mon">Mon</string>
+    <string name="day_tue">Tue</string>
+    <string name="day_wed">Wed</string>
+    <string name="day_thu">Thu</string>
+    <string name="day_fri">Fri</string>
+    <string name="day_sat">Sat</string>
+    <string name="day_sun">Sun</string>
+
+    <string name="hours_unit">h</string>
+    <string name="mins_unit">m</string>
+    <string name="secs_unit">s</string>
+
+    <string name="select_date">Select date</string>
+    <string name="clear_date">Clear date</string>
+    <string name="specific_date">Date</string>
+    <string name="repeat_days">Repeat</string>
+    <string name="timer_name_hint">Timer name (optional)</string>
+    <string name="alarm_name_hint">Alarm name (optional)</string>
+    <string name="chip_tea">Tea</string>
+    <string name="chip_cooking">Cooking</string>
+    <string name="chip_workout">Workout</string>
+    <string name="chip_nap">Nap</string>
+    <string name="chip_laundry">Laundry</string>
+    <string name="chip_work">Work</string>
+    <string name="chip_medicine">Medicine</string>
+    <string name="snooze_five">Snooze 5 min</string>
+    <string name="stop_timer">Stop</string>
+    <string name="timer_hour_stat">%1$d min · %2$d×</string>
+    <string name="timer_alert_channel">Timer done</string>
+    <string name="customize">Customize</string>
+</resources>
