@@ -4,6 +4,9 @@ A light, Material 3 Expressive alarm clock and timer for Android.
 
 The one thing that pushed me to build it: **an alarm that repeats every 2 weeks** (lectures on alternate weeks). Most clock apps can only repeat weekly or daily, so I made one that can.
 
+[![Download APK (beta)](https://img.shields.io/badge/Download-APK%20(beta)-6750A4?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Mikhas-Rahulia/pixel-clock/releases/download/v1.0.0-beta.1/pixel-clock-1.0.0-beta.1-universal.apk)
+[![All releases](https://img.shields.io/badge/All%20releases-GitHub-24292F?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Mikhas-Rahulia/pixel-clock/releases)
+
 <img src="docs/linkedin-post-image.png" alt="Every 2 weeks alarms: alarm list sorted by time of day and the biweekly editor" width="480">
 
 More: [alarm list](docs/screenshots/01-every-2-weeks-list.png), [biweekly editor](docs/screenshots/02-biweekly-editor.png).
@@ -20,6 +23,19 @@ More: [alarm list](docs/screenshots/01-every-2-weeks-list.png), [biweekly editor
   - Repeated runs of the same timer within an hour show total minutes and run count, e.g. `12 min · 3×`.
 - **Design**
   - Material 3 Expressive, fixed palette, predictive back gesture, animated tab icons.
+
+## Download
+
+Pre-release builds are on the [Releases](https://github.com/Mikhas-Rahulia/pixel-clock/releases) page. Not sure which one? Take **universal**, it runs on every device.
+
+| File | For |
+| --- | --- |
+| `pixel-clock-1.0.0-beta.1-arm64-v8a.apk` | Most phones made after 2016 |
+| `pixel-clock-1.0.0-beta.1-armeabi-v7a.apk` | Older 32-bit ARM phones |
+| `pixel-clock-1.0.0-beta.1-x86_64.apk` / `-x86.apk` | Emulators and Intel-based devices |
+| `pixel-clock-1.0.0-beta.1-universal.apk` | Any device (a bit larger) |
+
+Checksums are in `SHA256SUMS.txt` next to the files. Android 8.0 (API 26) or newer. You may need to allow installing apps from your browser or file manager the first time. These pre-release builds are signed with a debug key, so they will not update over a future release signed with a different key.
 
 ## Privacy
 
