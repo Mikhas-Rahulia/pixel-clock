@@ -29,9 +29,16 @@ data class AlarmModel(
     val weekParity: Int = currentWeekParity(),
     val vibrate: Boolean = true,
     val soundTitle: String = "",
-    val soundUri: String? = null
+    val soundUri: String? = null,
+    // Optional pause, inclusive ISO dates. The alarm stays on but does not ring on these days.
+    // A single paused day has pauseFrom == pauseUntil.
+    val pauseFrom: String? = null,
+    val pauseUntil: String? = null
 ) {
     companion object {
+        /** Upper bound for how far past a pause we look for the next ring (about ten years). */
+        private const val MAX_PAUSE_DAYS = 3700
+
         fun currentWeekParity(now: LocalDate = LocalDate.now()): Int {
             val epochDay = now.toEpochDay()
             val epochWeek = (epochDay + 3) / 7
@@ -72,7 +79,26 @@ data class AlarmModel(
         return currentWeekParity(now) == weekParity
     }
 
-    fun getNextTriggerMillis(now: LocalDateTime = LocalDateTime.now()): Long {
+    /** The pause as (first day, last day), both inclusive, or null when none is set. */
+    fun pauseRange(): Pair<LocalDate, LocalDate>? {
+        val from = pauseFrom?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+        val until = pauseUntil?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: from
+        return if (until.isBefore(from)) until to from else from to until
+    }
+
+    fun isPausedOn(date: LocalDate): Boolean {
+        val (from, until) = pauseRange() ?: return false
+        return !date.isBefore(from) && !date.isAfter(until)
+    }
+
+    /** True while a pause is set that has not fully passed yet (it ends today or later). */
+    fun hasPauseAhead(today: LocalDate = LocalDate.now()): Boolean {
+        val (_, until) = pauseRange() ?: return false
+        return !until.isBefore(today)
+    }
+
+    /** Same as [getNextTriggerMillis] but returns null when the alarm will not ring (a dated alarm inside its pause). */
+    fun nextTriggerMillisOrNull(now: LocalDateTime = LocalDateTime.now()): Long? {
         val zone = ZoneId.systemDefault()
         val alarmTime = LocalTime.of(hour, minute, 0)
 
@@ -80,6 +106,7 @@ data class AlarmModel(
         if (!specificDate.isNullOrBlank()) {
             try {
                 val targetDate = LocalDate.parse(specificDate)
+                if (isPausedOn(targetDate)) return null
                 val targetDateTime = LocalDateTime.of(targetDate, alarmTime)
                 return targetDateTime.atZone(zone).toInstant().toEpochMilli()
             } catch (e: Exception) {
@@ -89,17 +116,26 @@ data class AlarmModel(
 
         val today = now.toLocalDate()
 
-        // 2. If no recurring days are set, schedule for today if in future, else tomorrow
+        // 2. If no recurring days are set, schedule for today if in future, else tomorrow,
+        //    then move past any paused days
         if (daysOfWeek.isEmpty()) {
             var targetDateTime = LocalDateTime.of(today, alarmTime)
             if (!targetDateTime.isAfter(now)) {
                 targetDateTime = targetDateTime.plusDays(1)
             }
+            var guard = 0
+            while (isPausedOn(targetDateTime.toLocalDate()) && guard++ < MAX_PAUSE_DAYS) {
+                targetDateTime = targetDateTime.plusDays(1)
+            }
             return targetDateTime.atZone(zone).toInstant().toEpochMilli()
         }
 
-        // 3. Repeating days with optional bi-weekly cadence
-        for (dayOffset in 0..28) {
+        // 3. Repeating days with optional bi-weekly cadence, skipping paused days.
+        //    The search window grows with the pause so a long pause still finds the next ring.
+        val pauseDaysAhead = pauseRange()?.let { (_, until) ->
+            if (until.isBefore(today)) 0 else ChronoUnit.DAYS.between(today, until).toInt() + 1
+        } ?: 0
+        for (dayOffset in 0..(28 + pauseDaysAhead.coerceAtMost(MAX_PAUSE_DAYS))) {
             val candidateDate = today.plusDays(dayOffset.toLong())
             val candidateDayOfWeek = candidateDate.dayOfWeek.value
 
@@ -110,6 +146,7 @@ data class AlarmModel(
                         continue
                     }
                 }
+                if (isPausedOn(candidateDate)) continue
 
                 val candidateDateTime = LocalDateTime.of(candidateDate, alarmTime)
                 if (candidateDateTime.isAfter(now)) {
@@ -118,7 +155,12 @@ data class AlarmModel(
             }
         }
 
-        return now.plusDays(1).atZone(zone).toInstant().toEpochMilli()
+        return null
+    }
+
+    fun getNextTriggerMillis(now: LocalDateTime = LocalDateTime.now()): Long {
+        return nextTriggerMillisOrNull(now)
+            ?: now.plusDays(1).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
     }
 
     /**
@@ -130,7 +172,7 @@ data class AlarmModel(
     ): String {
         if (!isEnabled) return ""
 
-        val nextTriggerMillis = getNextTriggerMillis(now)
+        val nextTriggerMillis = nextTriggerMillisOrNull(now) ?: return ""
         val nextDateTime = LocalDateTime.ofInstant(
             java.time.Instant.ofEpochMilli(nextTriggerMillis),
             ZoneId.systemDefault()

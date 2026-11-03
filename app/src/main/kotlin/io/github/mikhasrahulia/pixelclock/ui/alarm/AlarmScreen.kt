@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -51,6 +52,8 @@ import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Label
+import androidx.compose.material.icons.rounded.PauseCircle
+import io.github.mikhasrahulia.pixelclock.ui.components.ExpressiveDateRangePickerDialog
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SyncAlt
@@ -120,6 +123,7 @@ fun AlarmScreen(
     var expandedAlarmId by remember { mutableStateOf<String?>(null) }
     var editingTimeAlarm by remember { mutableStateOf<AlarmModel?>(null) }
     var pickingDateAlarm by remember { mutableStateOf<AlarmModel?>(null) }
+    var pausingAlarmId by remember { mutableStateOf<String?>(null) }
     val focusManager = LocalFocusManager.current
 
     // Tapping empty space drops focus, which also closes the keyboard. Child elements
@@ -205,6 +209,9 @@ fun AlarmScreen(
                             onPickDate = {
                                 pickingDateAlarm = alarm
                             },
+                            onPickPause = {
+                                pausingAlarmId = alarm.id
+                            },
                             onDelete = {
                                 scheduler.cancelAlarm(alarm.id)
                                 repository.deleteAlarm(alarm.id)
@@ -278,6 +285,37 @@ fun AlarmScreen(
             },
             onDismiss = { pickingDateAlarm = null }
         )
+    }
+
+    // Pause between dates (one day or a range). Always works on the latest saved alarm.
+    pausingAlarmId?.let { id ->
+        val current = repository.getAlarmById(id)
+        if (current == null) {
+            pausingAlarmId = null
+        } else {
+            val range = current.pauseRange()?.takeIf { current.hasPauseAhead() }
+            ExpressiveDateRangePickerDialog(
+                initialStart = range?.first,
+                initialEnd = range?.second,
+                onConfirm = { from, until ->
+                    val updated = (repository.getAlarmById(id) ?: current).copy(
+                        pauseFrom = from.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                        pauseUntil = until.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                    )
+                    repository.updateAlarm(updated)
+                    scheduler.scheduleAlarm(updated)
+                },
+                onClear = if (range != null) {
+                    {
+                        val updated = (repository.getAlarmById(id) ?: current)
+                            .copy(pauseFrom = null, pauseUntil = null)
+                        repository.updateAlarm(updated)
+                        scheduler.scheduleAlarm(updated)
+                    }
+                } else null,
+                onDismiss = { pausingAlarmId = null }
+            )
+        }
     }
 }
 
@@ -464,6 +502,7 @@ fun ExpressiveAlarmCard(
     onShiftCycle: () -> Unit,
     onEditTime: () -> Unit,
     onPickDate: () -> Unit,
+    onPickPause: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -473,6 +512,25 @@ fun ExpressiveAlarmCard(
     val nextOccurrence = remember(alarm) { alarm.getFormattedNextOccurrence(context) }
     val focusManager = LocalFocusManager.current
     var nameFocused by remember { mutableStateOf(false) }
+
+    // Pause status, shown on the card and in the editor. Only while the pause has not fully passed.
+    val pauseRange = alarm.pauseRange()?.takeIf { alarm.hasPauseAhead() }
+    val pauseDayFormat = remember { DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()) }
+    // Non-breaking space so "20 Nov" is never split across two lines
+    fun pauseDay(date: LocalDate): String = date.format(pauseDayFormat).replace(' ', '\u00A0')
+    val pauseText: String? = pauseRange?.let { (from, until) ->
+        val today = LocalDate.now()
+        when {
+            !from.isAfter(today) && until == today -> stringResource(R.string.pause_today)
+            !from.isAfter(today) -> stringResource(R.string.pause_until, pauseDay(until))
+            from == until -> stringResource(R.string.pause_single, pauseDay(from))
+            else -> stringResource(
+                R.string.pause_range,
+                pauseDay(from),
+                pauseDay(until)
+            )
+        }
+    }
 
     ElevatedCard(
         modifier = modifier
@@ -539,6 +597,15 @@ fun ExpressiveAlarmCard(
                         },
                         fontWeight = if (alarm.isEnabled && alarm.isBiWeekly) FontWeight.Bold else FontWeight.Normal
                     )
+
+                    if (alarm.isEnabled && pauseText != null) {
+                        Text(
+                            text = pauseText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
 
                     if (alarm.isEnabled && nextOccurrence.isNotBlank()) {
                         Text(
@@ -766,6 +833,65 @@ fun ExpressiveAlarmCard(
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = stringResource(R.string.shift_cycle),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Pause between dates: one day or a range, then the alarm resumes by itself
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = if (pauseText != null) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
+                        else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .clickable { onPickPause() }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                                .fillMaxWidth()
+                                .heightIn(min = 40.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.PauseCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = pauseText ?: stringResource(R.string.pause_button),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (pauseText != null) {
+                                FilledTonalButton(
+                                    onClick = { onUpdateAlarm(alarm.copy(pauseFrom = null, pauseUntil = null)) },
+                                    shape = RoundedCornerShape(16.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.pause_resume),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,

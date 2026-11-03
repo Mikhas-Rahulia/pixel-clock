@@ -45,6 +45,9 @@ import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -591,6 +594,107 @@ fun ExpressiveDatePickerDialog(
                                     .atZone(ZoneOffset.UTC)
                                     .toLocalDate()
                                 onDateSelected(localDate)
+                            }
+                            onDismiss()
+                        },
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Text(stringResource(R.string.save), fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Pick one day (tap once) or a range (tap first and last day) during which an alarm stays silent.
+ * Past days cannot be picked. When a pause already exists, [onClear] resumes the alarm.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ExpressiveDateRangePickerDialog(
+    initialStart: LocalDate? = null,
+    initialEnd: LocalDate? = null,
+    onConfirm: (LocalDate, LocalDate) -> Unit,
+    onClear: (() -> Unit)? = null,
+    onDismiss: () -> Unit
+) {
+    fun LocalDate.utcMillis(): Long = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    fun Long.utcDate(): LocalDate = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
+
+    val today = remember { LocalDate.now() }
+    val state = rememberDateRangePickerState(
+        initialSelectedStartDateMillis = initialStart?.utcMillis(),
+        initialSelectedEndDateMillis = initialEnd?.utcMillis(),
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                utcTimeMillis >= today.utcMillis()
+
+            override fun isSelectableYear(year: Int): Boolean = year >= today.year
+        }
+    )
+    val startMillis = state.selectedStartDateMillis
+    // One tap = one paused day. A second tap makes it a range.
+    val endMillis = state.selectedEndDateMillis ?: startMillis
+
+    PredictiveBackLayer(onDismiss = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .fillMaxWidth()
+        ) {
+            Column {
+                Text(
+                    text = stringResource(R.string.pause_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp)
+                )
+                Text(
+                    text = stringResource(R.string.pause_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp)
+                )
+                DateRangePicker(
+                    state = state,
+                    title = null,
+                    showModeToggle = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(460.dp)
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onClear != null) {
+                        TextButton(
+                            onClick = {
+                                onClear()
+                                onDismiss()
+                            },
+                            shape = RoundedCornerShape(18.dp)
+                        ) {
+                            Text(stringResource(R.string.pause_resume), fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                    TextButton(onClick = onDismiss, shape = RoundedCornerShape(18.dp)) {
+                        Text(stringResource(R.string.cancel), fontWeight = FontWeight.SemiBold)
+                    }
+                    Spacer(modifier = Modifier.size(8.dp))
+                    Button(
+                        enabled = startMillis != null,
+                        onClick = {
+                            if (startMillis != null && endMillis != null) {
+                                onConfirm(startMillis.utcDate(), endMillis.utcDate())
                             }
                             onDismiss()
                         },

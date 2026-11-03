@@ -11,17 +11,17 @@ android {
     applicationId = "io.github.mikhasrahulia.pixelclock"
     minSdk = 26
     targetSdk = 35
-    versionCode = 1
-    versionName = "1.0.0-beta.1"
+    versionCode = 2
+    versionName = "1.0.0-beta.2"
   }
 
-  // One APK per CPU architecture (smaller download) plus a universal APK that runs everywhere.
+  // Release APK for 64-bit ARM only: that is every phone made after about 2016.
   splits {
     abi {
       isEnable = true
       reset()
-      include("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
-      isUniversalApk = true
+      include("arm64-v8a")
+      isUniversalApk = false
     }
   }
 

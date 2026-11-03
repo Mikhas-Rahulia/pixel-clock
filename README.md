@@ -4,12 +4,12 @@ A light, Material 3 Expressive alarm clock and timer for Android.
 
 The one thing that pushed me to build it: **an alarm that repeats every 2 weeks** (lectures on alternate weeks). Most clock apps can only repeat weekly or daily, so I made one that can.
 
-[![Download APK (beta)](https://img.shields.io/badge/Download-APK%20(beta)-6750A4?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Mikhas-Rahulia/pixel-clock/releases/download/v1.0.0-beta.1/pixel-clock-1.0.0-beta.1-universal.apk)
+[![Download APK (beta)](https://img.shields.io/badge/Download-APK%20(beta)-6750A4?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Mikhas-Rahulia/pixel-clock/releases/download/v1.0.0-beta.2/pixel-clock-1.0.0-beta.2-arm64-v8a.apk)
 [![All releases](https://img.shields.io/badge/All%20releases-GitHub-24292F?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Mikhas-Rahulia/pixel-clock/releases)
 
 <img src="docs/linkedin-post-image.png" alt="Every 2 weeks alarms: alarm list sorted by time of day and the biweekly editor" width="480">
 
-More: [alarm list](docs/screenshots/01-every-2-weeks-list.png), [biweekly editor](docs/screenshots/02-biweekly-editor.png).
+More: [alarm list](docs/screenshots/01-every-2-weeks-list.png), [biweekly editor](docs/screenshots/02-biweekly-editor.png), [pause between dates](docs/screenshots/03-pause-between-dates.png), [pause editor](docs/screenshots/04-pause-editor.png).
 
 ## Features
 
@@ -17,6 +17,7 @@ More: [alarm list](docs/screenshots/01-every-2-weeks-list.png), [biweekly editor
   - Defaults to the nearest full hour: today if still ahead, otherwise tomorrow.
   - One-time by default. Pick a date, or add weekdays with one tap afterwards.
   - Repeat **every 2 weeks** on chosen days.
+  - **Pause** an alarm for one day or a range of dates (holidays, exams). It resumes by itself afterwards.
 - **Timers**
   - Real system alarms (`AlarmManager`), so the timer runs in the background and fires on time.
   - Full-screen "Time's up" screen with Snooze and Stop, and +5 min from the notification.
@@ -26,16 +27,9 @@ More: [alarm list](docs/screenshots/01-every-2-weeks-list.png), [biweekly editor
 
 ## Download
 
-Pre-release builds are on the [Releases](https://github.com/Mikhas-Rahulia/pixel-clock/releases) page. Not sure which one? Take **universal**, it runs on every device.
+Pre-release builds are on the [Releases](https://github.com/Mikhas-Rahulia/pixel-clock/releases) page. There is one file: `pixel-clock-1.0.0-beta.2-arm64-v8a.apk`, for 64-bit ARM phones, which is almost every phone made after 2016.
 
-| File | For |
-| --- | --- |
-| `pixel-clock-1.0.0-beta.1-arm64-v8a.apk` | Most phones made after 2016 |
-| `pixel-clock-1.0.0-beta.1-armeabi-v7a.apk` | Older 32-bit ARM phones |
-| `pixel-clock-1.0.0-beta.1-x86_64.apk` / `-x86.apk` | Emulators and Intel-based devices |
-| `pixel-clock-1.0.0-beta.1-universal.apk` | Any device (a bit larger) |
-
-Checksums are in `SHA256SUMS.txt` next to the files. Android 8.0 (API 26) or newer. You may need to allow installing apps from your browser or file manager the first time. These pre-release builds are signed with a debug key, so they will not update over a future release signed with a different key.
+Checksum is in `SHA256SUMS.txt` next to the file. Android 8.0 (API 26) or newer. You may need to allow installing apps from your browser or file manager the first time. These pre-release builds are signed with a debug key, so they will not update over a future release signed with a different key.
 
 ## Privacy
 

@@ -19,7 +19,11 @@ class AlarmScheduler(private val context: Context) {
             return
         }
 
-        val triggerMillis = alarm.getNextTriggerMillis()
+        // Null means this alarm will not ring (a dated alarm that falls inside its pause)
+        val triggerMillis = alarm.nextTriggerMillisOrNull() ?: run {
+            cancelAlarm(alarm.id)
+            return
+        }
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             action = ACTION_ALARM_FIRE
             putExtra(EXTRA_ALARM_ID, alarm.id)
