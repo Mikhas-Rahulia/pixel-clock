@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
@@ -11,8 +11,8 @@ android {
     applicationId = "io.github.mikhasrahulia.pixelclock"
     minSdk = 26
     targetSdk = 35
-    versionCode = 2
-    versionName = "1.0.0-beta.2"
+    versionCode = 3
+    versionName = "1.0.0-beta.3"
   }
 
   // Release APK for 64-bit ARM only: that is every phone made after about 2016.

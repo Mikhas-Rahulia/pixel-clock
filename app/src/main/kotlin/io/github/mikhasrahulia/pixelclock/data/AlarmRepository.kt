@@ -5,18 +5,10 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import java.time.LocalDate
 
 class AlarmRepository(private val context: Context) {
     private val prefs: SharedPreferences =
-        context.clockPrefs("pixel_clock_alarms", KEY_ALARMS)
-
-    private val json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
+        context.clockPrefs(AlarmBackup.PREFS_NAME, KEY_ALARMS)
 
     private val _alarms = MutableStateFlow<List<AlarmModel>>(emptyList())
     val alarms: StateFlow<List<AlarmModel>> = _alarms.asStateFlow()
@@ -26,49 +18,41 @@ class AlarmRepository(private val context: Context) {
     }
 
     private fun loadAlarms() {
-        val jsonStr = prefs.getString(KEY_ALARMS, null)
-        if (jsonStr != null) {
-            try {
-                val list = json.decodeFromString<List<AlarmModel>>(jsonStr)
-                _alarms.value = list
-                return
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+        val fromPrefs = prefs.getString(KEY_ALARMS, null)?.let { AlarmBackup.decode(it) }
+        val fromImport = AlarmBackup.consumeImportFile(context)
+        val fromLegacy = AlarmBackup.readLegacyPackage(context)
+        val fromBackup = AlarmBackup.readBackup(context)
+
+        var list = fromPrefs ?: emptyList()
+        // A JSON file dropped next to the app (or adb-pushed) wins as a one-shot import.
+        if (fromImport != null) {
+            list = AlarmBackup.merge(list, fromImport)
+        } else if (fromLegacy != null && (list.isEmpty() || AlarmBackup.isDemoSeed(list))) {
+            list = AlarmBackup.merge(list, fromLegacy)
+        } else if (list.isEmpty() && fromBackup != null) {
+            list = fromBackup
         }
 
-        // Default initial alarms for Pixel experience
-        val currentParity = AlarmModel.currentWeekParity(LocalDate.now())
-        val defaultList = listOf(
-            AlarmModel(
-                hour = 7,
-                minute = 0,
-                label = "",
-                isEnabled = true,
-                daysOfWeek = setOf(1, 2, 3, 4, 5),
-                isBiWeekly = false
-            ),
-            AlarmModel(
-                hour = 8,
-                minute = 30,
-                label = "",
-                isEnabled = true,
-                daysOfWeek = setOf(1, 3, 5), // Mon, Wed, Fri
-                isBiWeekly = true,
-                weekParity = currentParity // Active this week
-            )
-        )
-        _alarms.value = defaultList
-        saveAlarms(defaultList)
+        _alarms.value = list
+        saveAlarms(list)
+        if (prefs.getInt(AlarmBackup.KEY_SCHEMA, 0) < AlarmBackup.SCHEMA_VERSION) {
+            prefs.edit().putInt(AlarmBackup.KEY_SCHEMA, AlarmBackup.SCHEMA_VERSION).apply()
+        }
     }
 
     private fun saveAlarms(list: List<AlarmModel>) {
         try {
-            val jsonStr = json.encodeToString(list)
+            val jsonStr = AlarmBackup.encode(list)
             prefs.edit().putString(KEY_ALARMS, jsonStr).apply()
+            AlarmBackup.writeBackup(context, list)
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    fun replaceAll(list: List<AlarmModel>) {
+        _alarms.value = list
+        saveAlarms(list)
     }
 
     fun addAlarm(alarm: AlarmModel) {
@@ -122,7 +106,7 @@ class AlarmRepository(private val context: Context) {
     }
 
     companion object {
-        private const val KEY_ALARMS = "key_alarms_list"
+        private const val KEY_ALARMS = AlarmBackup.KEY_ALARMS
 
         @Volatile
         private var instance: AlarmRepository? = null

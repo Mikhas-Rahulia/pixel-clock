@@ -35,6 +35,18 @@
             </intent-filter>
         </activity>
 
+        <!-- Lets voice assistants and other apps create alarms (no UI) -->
+        <activity
+            android:name=".alarm.SetAlarmActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.SET_ALARM" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <!-- Alarm Ringing Fullscreen Activity -->
         <activity
             android:name=".alarm.AlarmRingingActivity"
