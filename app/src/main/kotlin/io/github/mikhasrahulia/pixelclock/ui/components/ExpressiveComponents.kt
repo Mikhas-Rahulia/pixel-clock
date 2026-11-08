@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -60,6 +61,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimeInput
 import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.rememberDatePickerState
@@ -488,68 +490,54 @@ fun ExpressiveTimePickerDialog(
         initialMinute = initialMinute,
         is24Hour = is24Hour
     )
-    var isKeyboardMode by remember { mutableStateOf(true) }
 
     PredictiveBackLayer(onDismiss = onDismiss) {
         Surface(
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             modifier = Modifier
-                .padding(16.dp)
+                .padding(horizontal = 24.dp)
                 .fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier
+                    .padding(24.dp)
+                    .imePadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Text(
+                    text = stringResource(R.string.select_time),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 20.dp)
+                )
+
+                TimeInput(
+                    state = timePickerState,
+                    colors = TimePickerDefaults.colors(
+                        timeSelectorSelectedContainerColor = Color(0xFF35343C),
+                        timeSelectorSelectedContentColor = Color(0xFFFFFFFF),
+                        timeSelectorUnselectedContainerColor = Color(0xFF25242C),
+                        timeSelectorUnselectedContentColor = Color(0xFF8E8D96)
+                    )
+                )
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.select_time),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    IconButton(onClick = { isKeyboardMode = !isKeyboardMode }) {
-                        Icon(
-                            imageVector = if (isKeyboardMode) Icons.Rounded.Schedule else Icons.Rounded.Keyboard,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                if (isKeyboardMode) {
-                    KeyboardTimeFields(timePickerState)
-                } else {
-                    TimePicker(
-                        state = timePickerState,
-                        colors = TimePickerDefaults.colors(
-                            clockDialColor = Color(0xFF28272F),
-                            selectorColor = Color(0xFFFFFFFF),
-                            containerColor = Color(0xFF1E1E24),
-                            clockDialSelectedContentColor = Color(0xFF191C20),
-                            clockDialUnselectedContentColor = Color(0xFFE3E1E9),
-                            timeSelectorSelectedContainerColor = Color(0xFF35343C),
-                            timeSelectorSelectedContentColor = Color(0xFFFFFFFF),
-                            timeSelectorUnselectedContainerColor = Color(0xFF25242C),
-                            timeSelectorUnselectedContentColor = Color(0xFF8E8D96)
-                        )
-                    )
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
+                        .padding(top = 24.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = onDismiss, shape = RoundedCornerShape(18.dp)) {
-                        Text(stringResource(R.string.cancel), fontWeight = FontWeight.SemiBold, color = Color(0xFFE3E1E9))
+                        Text(
+                            stringResource(R.string.cancel),
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFE3E1E9)
+                        )
                     }
                     Surface(
                         shape = RoundedCornerShape(20.dp),
