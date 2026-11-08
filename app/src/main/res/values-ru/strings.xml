@@ -76,4 +76,18 @@
     <string name="collapse">Свернуть</string>
     <string name="expand">Развернуть</string>
     <string name="toggle_mode">Сменить режим</string>
+
+    <string name="edit">Изменить</string>
+    <string name="upcoming_alarm">Предстоящий будильник</string>
+    <string name="set_alarm_date">Установить дату</string>
+    <string name="alarm_name_title">Название будильника</string>
+    <string name="timer_start">Запустить</string>
+    <string name="hours_label">Часы</string>
+    <string name="mins_label">Минуты</string>
+    <string name="secs_label">Секунды</string>
+    <string name="close">Закрыть</string>
+    <string name="timer_for_five_min">Таймер на 5 мин</string>
+
+    <string name="today">Сегодня</string>
+    <string name="tomorrow">Завтра</string>
 </resources>

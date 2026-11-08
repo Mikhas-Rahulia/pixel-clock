@@ -272,12 +272,12 @@ fun ExpressiveNavBar(
         AppTab.entries.forEach { tab ->
             val isSelected = selectedTab == tab
             val containerColor by animateColorAsState(
-                targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                targetValue = if (isSelected) Color(0xFF35343C) else Color.Transparent,
                 animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
                 label = "tabColor"
             )
             val contentColor by animateColorAsState(
-                targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                targetValue = if (isSelected) Color(0xFFE3E1E9) else Color(0xFF8E8D96),
                 animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
                 label = "tabTextColor"
             )
@@ -529,11 +529,15 @@ fun ExpressiveTimePickerDialog(
                     TimePicker(
                         state = timePickerState,
                         colors = TimePickerDefaults.colors(
-                            clockDialColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            selectorColor = MaterialTheme.colorScheme.primary,
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            timeSelectorSelectedContainerColor = MaterialTheme.colorScheme.primary,
-                            timeSelectorSelectedContentColor = MaterialTheme.colorScheme.onPrimary
+                            clockDialColor = Color(0xFF28272F),
+                            selectorColor = Color(0xFFFFFFFF),
+                            containerColor = Color(0xFF1E1E24),
+                            clockDialSelectedContentColor = Color(0xFF191C20),
+                            clockDialUnselectedContentColor = Color(0xFFE3E1E9),
+                            timeSelectorSelectedContainerColor = Color(0xFF35343C),
+                            timeSelectorSelectedContentColor = Color(0xFFFFFFFF),
+                            timeSelectorUnselectedContainerColor = Color(0xFF25242C),
+                            timeSelectorUnselectedContentColor = Color(0xFF8E8D96)
                         )
                     )
                 }
@@ -541,17 +545,25 @@ fun ExpressiveTimePickerDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = onDismiss, shape = RoundedCornerShape(18.dp)) {
-                        Text(stringResource(R.string.cancel), fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.cancel), fontWeight = FontWeight.SemiBold, color = Color(0xFFE3E1E9))
                     }
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Button(
-                        onClick = { onConfirm(timePickerState.hour, timePickerState.minute) },
-                        shape = RoundedCornerShape(18.dp)
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFFFFFFFF),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { onConfirm(timePickerState.hour, timePickerState.minute) }
                     ) {
-                        Text(stringResource(R.string.save), fontWeight = FontWeight.Bold)
+                        Text(
+                            stringResource(R.string.save),
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF191C20),
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp)
+                        )
                     }
                 }
             }

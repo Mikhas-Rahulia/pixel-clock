@@ -11,8 +11,8 @@ android {
     applicationId = "io.github.mikhasrahulia.pixelclock"
     minSdk = 26
     targetSdk = 35
-    versionCode = 7
-    versionName = "1.0.0-beta.7"
+    versionCode = 8
+    versionName = "1.0.0-beta.8"
   }
 
   // Release APK for 64-bit ARM only: that is every phone made after about 2016.

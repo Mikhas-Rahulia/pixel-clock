@@ -1,19 +1,18 @@
 package io.github.mikhasrahulia.pixelclock.ui.timer
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,23 +26,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Label
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,22 +54,23 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.mikhasrahulia.pixelclock.R
-import io.github.mikhasrahulia.pixelclock.ui.components.PredictiveBackLayer
-import io.github.mikhasrahulia.pixelclock.ui.components.autoFocusModifier
 import io.github.mikhasrahulia.pixelclock.data.TimerModel
 import io.github.mikhasrahulia.pixelclock.timer.TimerManager
+import io.github.mikhasrahulia.pixelclock.ui.components.PredictiveBackLayer
+import io.github.mikhasrahulia.pixelclock.ui.components.autoFocusModifier
+import kotlinx.coroutines.isActive
 
 @Composable
 fun TimerScreen(
@@ -87,7 +81,6 @@ fun TimerScreen(
     var isAddingTimer by remember { mutableStateOf(false) }
     var editingTimerLabel by remember { mutableStateOf<TimerModel?>(null) }
 
-    // If there are no active/running timers, show the Google Clock keypad input
     val showKeypad = timers.isEmpty() || isAddingTimer
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -100,7 +93,7 @@ fun TimerScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 12.dp, bottom = 8.dp, start = 4.dp, end = 4.dp),
+                    .padding(top = 12.dp, bottom = 12.dp, start = 4.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -110,22 +103,6 @@ fun TimerScreen(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-
-                if (!showKeypad && timers.isNotEmpty()) {
-                    FilledTonalButton(
-                        onClick = { isAddingTimer = true },
-                        shape = RoundedCornerShape(18.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.add_timer), fontWeight = FontWeight.Bold)
-                    }
-                }
             }
 
             AnimatedContent(
@@ -133,7 +110,7 @@ fun TimerScreen(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 transitionSpec = {
                     (fadeIn(spring(stiffness = Spring.StiffnessMedium)) +
-                        scaleIn(initialScale = 0.92f, animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)))
+                        scaleIn(initialScale = 0.94f, animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)))
                         .togetherWith(fadeOut(spring(stiffness = Spring.StiffnessMedium)))
                 },
                 label = "timerContent"
@@ -157,22 +134,40 @@ fun TimerScreen(
                         onReset = { timerManager.resetTimer(it) },
                         onDelete = { timerManager.deleteTimer(it) },
                         onAddFiveMin = { timerManager.addFiveMinutes(it) },
-                        onEditLabel = { timer -> editingTimerLabel = timer },
-                        timerManager = timerManager
+                        onEditLabel = { timer -> editingTimerLabel = timer }
                     )
                 }
             }
         }
+
+        // FAB + when active timers are running and keypad is not shown
+        if (!showKeypad && timers.isNotEmpty()) {
+            FloatingActionButton(
+                onClick = { isAddingTimer = true },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 20.dp, bottom = 20.dp)
+                    .size(64.dp),
+                shape = RoundedCornerShape(22.dp),
+                containerColor = Color(0xFF35343C),
+                contentColor = Color(0xFFE3E1E9)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = stringResource(R.string.add_timer),
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
     }
 
-    // Timer label edit dialog
     editingTimerLabel?.let { timerToEdit ->
         var tempLabel by remember(timerToEdit.id) { mutableStateOf(timerToEdit.label) }
 
         PredictiveBackLayer(onDismiss = { editingTimerLabel = null }) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = Color(0xFF1E1E24),
                 modifier = Modifier
                     .padding(horizontal = 24.dp)
                     .fillMaxWidth()
@@ -181,7 +176,8 @@ fun TimerScreen(
                     Text(
                         text = stringResource(R.string.label),
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFE3E1E9)
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     OutlinedTextField(
@@ -200,16 +196,25 @@ fun TimerScreen(
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(onClick = { editingTimerLabel = null }) {
-                            Text(stringResource(R.string.cancel))
+                            Text(stringResource(R.string.cancel), color = Color(0xFFE3E1E9))
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        FilledTonalButton(
-                            onClick = {
-                                timerManager.updateLabel(timerToEdit.id, tempLabel)
-                                editingTimerLabel = null
-                            }
+                        Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            color = Color(0xFFFFFFFF),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(18.dp))
+                                .clickable {
+                                    timerManager.updateLabel(timerToEdit.id, tempLabel)
+                                    editingTimerLabel = null
+                                }
                         ) {
-                            Text(stringResource(R.string.save))
+                            Text(
+                                stringResource(R.string.save),
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF191C20),
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                            )
                         }
                     }
                 }
@@ -219,18 +224,20 @@ fun TimerScreen(
 }
 
 /**
- * Google Clock's signature numpad input view with label input and quick chips
+ * Google Clock's M3E keypad input view (Screenshot 2).
+ * Restriction: ONLY 5 minutes preset chip at start.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GoogleClockKeypadInput(
     timerManager: TimerManager,
     onStartTimer: (Long, String) -> Unit,
     onCancel: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
     var digits by remember { mutableStateOf("") }
     var timerLabel by remember { mutableStateOf("") }
 
-    // Parse digits (up to 6 digits: HHMMSS)
     val padded = digits.padStart(6, '0')
     val hours = padded.substring(0, 2).toInt()
     val minutes = padded.substring(2, 4).toInt()
@@ -241,103 +248,100 @@ fun GoogleClockKeypadInput(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(bottom = 12.dp),
+            .padding(bottom = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Top section: Digits readout + Label Input + Quick Chips
+        // Digits Readout (00  00  00) with labels below
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(top = 4.dp)
+            modifier = Modifier.padding(top = 8.dp)
         ) {
-            // Digits Readout (00h 00m 00s)
             Row(
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.Center
             ) {
-                TimeSegment(
+                // Segment 1: Hours
+                TimeSegmentColumn(
                     value = padded.substring(0, 2),
-                    unit = stringResource(R.string.hours_unit),
-                    isActive = hours > 0
+                    label = stringResource(R.string.hours_label),
+                    hasInput = digits.length >= 5
                 )
-                Spacer(modifier = Modifier.width(12.dp))
-                TimeSegment(
+                Spacer(modifier = Modifier.width(20.dp))
+                // Segment 2: Minutes
+                TimeSegmentColumn(
                     value = padded.substring(2, 4),
-                    unit = stringResource(R.string.mins_unit),
-                    isActive = hours > 0 || minutes > 0
+                    label = stringResource(R.string.mins_label),
+                    hasInput = digits.length >= 3
                 )
-                Spacer(modifier = Modifier.width(12.dp))
-                TimeSegment(
+                Spacer(modifier = Modifier.width(20.dp))
+                // Segment 3: Seconds
+                TimeSegmentColumn(
                     value = padded.substring(4, 6),
-                    unit = stringResource(R.string.secs_unit),
-                    isActive = hours > 0 || minutes > 0 || seconds > 0
+                    label = stringResource(R.string.secs_label),
+                    hasInput = digits.isNotEmpty()
                 )
             }
 
-            val runs by timerManager.runs.collectAsState()
-            val typedStat = remember(runs, totalSeconds) {
-                timerManager.hourStat(totalSeconds * 1000L)
-            }
-            if (typedStat.starts >= 2) {
-                Spacer(modifier = Modifier.height(8.dp))
-                HourStatChip(typedStat.completedMinutes, typedStat.starts)
-            }
+            Spacer(modifier = Modifier.height(20.dp))
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Clean single-line optional label field (effortless, no extra buttons or popups!)
-            OutlinedTextField(
-                value = timerLabel,
-                onValueChange = { timerLabel = it },
-                singleLine = true,
-                placeholder = {
-                    Text(
-                        stringResource(R.string.timer_name_hint),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Rounded.Label,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                },
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth(0.85f)
-                    .height(52.dp)
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // The ONLY extra button in timer: +5 minutes! Immediately launches or extends timer!
-            FilledTonalButton(
-                onClick = {
-                    val durationToStart = if (hasTime) (totalSeconds + 300L) * 1000L else 300_000L
-                    onStartTimer(durationToStart, timerLabel)
-                    digits = ""
-                    timerLabel = ""
-                },
+            // Preset Chip: ONLY 5 minutes at start! (Constraint satisfied)
+            Surface(
                 shape = RoundedCornerShape(20.dp),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
+                color = Color(0xFF25242C),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable {
+                        onStartTimer(300_000L, timerLabel.ifBlank { context.getString(R.string.timer_for_five_min) })
+                    }
             ) {
                 Text(
-                    text = stringResource(R.string.plus_5_min),
+                    text = "5 min",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = Color(0xFFE3E1E9),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp)
                 )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Big Start pill button: Rozpocznij
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = if (hasTime) Color(0xFF35343C) else Color(0xFF1E1D24),
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .clickable(enabled = hasTime) {
+                        if (hasTime) {
+                            onStartTimer(totalSeconds * 1000L, timerLabel)
+                            digits = ""
+                            timerLabel = ""
+                        }
+                    }
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.timer_start),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (hasTime) Color(0xFFE3E1E9) else Color(0xFF5A5862)
+                    )
+                }
             }
         }
 
-        // Numpad Grid (3 cols x 4 rows)
+        // Clean Numpad Grid (No circular backgrounds!)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = 28.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             val rows = listOf(
@@ -350,54 +354,63 @@ fun GoogleClockKeypadInput(
             rows.forEach { row ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     row.forEach { key ->
                         Box(
                             modifier = Modifier
-                                .size(72.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                .clickable {
-                                    when (key) {
-                                        "del" -> {
-                                            if (digits.isNotEmpty()) {
-                                                digits = digits.dropLast(1)
+                                .size(width = 80.dp, height = 56.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .combinedClickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = {
+                                        when (key) {
+                                            "del" -> {
+                                                if (digits.isNotEmpty()) {
+                                                    digits = digits.dropLast(1)
+                                                }
                                             }
-                                        }
-                                        "00" -> {
-                                            if (digits.isNotEmpty() && digits.length < 5) {
-                                                digits += "00"
-                                            } else if (digits.length == 5) {
-                                                digits += "0"
+                                            "00" -> {
+                                                if (digits.isNotEmpty() && digits.length < 5) {
+                                                    digits += "00"
+                                                } else if (digits.length == 5) {
+                                                    digits += "0"
+                                                }
                                             }
-                                        }
-                                        else -> {
-                                            if (digits.length < 6) {
-                                                if (digits.isNotEmpty() || key != "0") {
-                                                    digits += key
+                                            else -> {
+                                                if (digits.length < 6) {
+                                                    if (digits.isNotEmpty() || key != "0") {
+                                                        digits += key
+                                                    }
                                                 }
                                             }
                                         }
+                                    },
+                                    onLongClick = {
+                                        if (key == "del") {
+                                            digits = ""
+                                        }
                                     }
-                                },
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
                             if (key == "del") {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Rounded.Backspace,
                                     contentDescription = stringResource(R.string.delete),
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(24.dp)
+                                    tint = Color(0xFFE3E1E9),
+                                    modifier = Modifier.size(28.dp)
                                 )
                             } else {
                                 Text(
                                     text = key,
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontSize = 26.sp,
-                                        fontWeight = FontWeight.Medium
+                                    style = MaterialTheme.typography.displaySmall.copy(
+                                        fontSize = 32.sp,
+                                        fontWeight = FontWeight.Normal
                                     ),
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = Color(0xFFE3E1E9)
                                 )
                             }
                         }
@@ -406,105 +419,56 @@ fun GoogleClockKeypadInput(
             }
         }
 
-        // Start FAB or Bottom Actions
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 32.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = if (onCancel != null) Arrangement.SpaceBetween else Arrangement.Center
-        ) {
-            if (onCancel != null) {
-                FilledTonalIconButton(
-                    onClick = onCancel,
-                    modifier = Modifier.size(56.dp),
-                    shape = CircleShape
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Delete,
-                        contentDescription = stringResource(R.string.cancel),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            FloatingActionButton(
-                onClick = {
-                    if (hasTime) {
-                        onStartTimer(totalSeconds * 1000L, timerLabel)
-                        digits = ""
-                        timerLabel = ""
-                    }
-                },
-                modifier = Modifier.size(76.dp),
-                shape = CircleShape,
-                containerColor = if (hasTime) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
-                contentColor = if (hasTime) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+        if (onCancel != null) {
+            TextButton(
+                onClick = onCancel,
+                modifier = Modifier.padding(bottom = 4.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.PlayArrow,
-                    contentDescription = stringResource(R.string.resume),
-                    modifier = Modifier.size(38.dp)
+                Text(
+                    text = stringResource(R.string.cancel),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color(0xFF8E8D96)
                 )
             }
-
-            if (onCancel != null) {
-                Spacer(modifier = Modifier.size(56.dp))
-            }
+        } else {
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
 
 @Composable
-fun HourStatChip(minutes: Int, starts: Int) {
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.tertiaryContainer
-    ) {
-        Text(
-            text = stringResource(R.string.timer_hour_stat, minutes, starts),
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onTertiaryContainer
-        )
-    }
-}
-
-@Composable
-fun TimeSegment(
+fun TimeSegmentColumn(
     value: String,
-    unit: String,
-    isActive: Boolean
+    label: String,
+    hasInput: Boolean
 ) {
-    Row(verticalAlignment = Alignment.Bottom) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Text(
             text = value,
             style = MaterialTheme.typography.displayLarge.copy(
-                fontSize = 54.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 58.sp,
+                fontWeight = FontWeight.Normal
             ),
-            color = if (isActive) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+            color = if (hasInput) Color(0xFFFFFFFF) else Color(0xFF52515A)
         )
         Text(
-            text = unit,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isActive) MaterialTheme.colorScheme.onSurface
-            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
-            modifier = Modifier.padding(bottom = 8.dp, start = 2.dp)
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFF8E8D96)
         )
     }
 }
 
 /**
- * Running Timers Display
+ * Running Timers Display (Screenshot 3).
+ * Restriction: ONLY 5 minutes (+5:00) button at end.
  */
 @Composable
 fun ActiveTimersList(
     timers: List<TimerModel>,
-    timerManager: TimerManager,
     onStart: (String) -> Unit,
     onPause: (String) -> Unit,
     onReset: (String) -> Unit,
@@ -512,46 +476,28 @@ fun ActiveTimersList(
     onAddFiveMin: (String) -> Unit,
     onEditLabel: (TimerModel) -> Unit
 ) {
-    if (timers.size == 1) {
-        // Single timer view: Large Circular Countdown (Google Clock style)
-        val timer = timers.first()
-        SingleRunningTimerView(
-            timer = timer,
-            onStart = { onStart(timer.id) },
-            onPause = { onPause(timer.id) },
-            onReset = { onReset(timer.id) },
-            onDelete = { onDelete(timer.id) },
-            onAddFiveMin = { onAddFiveMin(timer.id) },
-            onEditLabel = { onEditLabel(timer) },
-            timerManager = timerManager
-        )
-    } else {
-        // Multiple timers list
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 16.dp, top = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(timers, key = { it.id }) { timer ->
-                RunningTimerCard(
-                    timer = timer,
-                    onStart = { onStart(timer.id) },
-                    onPause = { onPause(timer.id) },
-                    onReset = { onReset(timer.id) },
-                    onDelete = { onDelete(timer.id) },
-                    onAddFiveMin = { onAddFiveMin(timer.id) },
-                    onEditLabel = { onEditLabel(timer) },
-                    timerManager = timerManager
-                )
-            }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 96.dp, top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items(timers, key = { it.id }) { timer ->
+            RunningTimerCard(
+                timer = timer,
+                onStart = { onStart(timer.id) },
+                onPause = { onPause(timer.id) },
+                onReset = { onReset(timer.id) },
+                onDelete = { onDelete(timer.id) },
+                onAddFiveMin = { onAddFiveMin(timer.id) },
+                onEditLabel = { onEditLabel(timer) }
+            )
         }
     }
 }
 
 @Composable
-fun SingleRunningTimerView(
+fun RunningTimerCard(
     timer: TimerModel,
-    timerManager: TimerManager,
     onStart: () -> Unit,
     onPause: () -> Unit,
     onReset: () -> Unit,
@@ -561,7 +507,7 @@ fun SingleRunningTimerView(
 ) {
     var currentTimeMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
-    // Butter-smooth 120 FPS continuous display frame synchronization (Zero stutter / snap!)
+    // Butter-smooth 120 FPS continuous display frame synchronization
     LaunchedEffect(timer.isRunning, timer.isPaused, timer.targetEndTimeMillis) {
         if (timer.isRunning && !timer.isPaused && timer.targetEndTimeMillis > 0) {
             while (isActive) {
@@ -583,261 +529,162 @@ fun SingleRunningTimerView(
     } else 0f
 
     val formattedTime = timer.formattedTime(if (timer.isRunning && !timer.isPaused) currentTimeMillis else System.currentTimeMillis())
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val timerTitle = if (timer.label.isNotBlank()) timer.label else stringResource(R.string.timer_for_five_min)
 
-    Column(
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = Color(0xFF1E1E24),
         modifier = Modifier
-            .fillMaxSize()
-            .padding(bottom = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
     ) {
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Large Circular Progress Ring (Fluid 120 FPS!)
-        Box(
+        Column(
             modifier = Modifier
-                .size(310.dp)
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val strokeWidth = 14.dp.toPx()
-                // Background Track
-                drawCircle(
-                    color = trackColor,
-                    style = Stroke(width = strokeWidth)
-                )
-                // Smooth Animated Progress Arc (Continuously interpolated every display frame)
-                val sweepAngle = 360f * progress
-                drawArc(
-                    color = primaryColor,
-                    startAngle = -90f,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
-            }
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .clickable { onEditLabel() }
-                    .padding(16.dp)
+            // Top Row inside card: Label + Clear (X) button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = formattedTime,
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontSize = 58.sp,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 4.dp)
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onEditLabel() }
+                        .padding(4.dp)
                 ) {
                     Text(
-                        text = if (timer.label.isNotBlank()) timer.label else stringResource(R.string.timer_name_hint),
+                        text = timerTitle,
                         style = MaterialTheme.typography.titleMedium,
-                        color = if (timer.label.isNotBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFE3E1E9)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Icon(
                         imageVector = Icons.Rounded.Edit,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        tint = Color(0xFF8E8D96)
+                    )
+                }
+
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Clear,
+                        contentDescription = stringResource(R.string.cancel),
+                        tint = Color(0xFFC6C5D0),
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
-        }
 
-        // Action Controls: +1:00, Play/Pause, Reset, Delete
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            val runs by timerManager.runs.collectAsState()
-            val stat = remember(runs, timer.originDurationMillis, currentTimeMillis / 60_000L) {
-                timerManager.hourStat(timer.originDurationMillis, currentTimeMillis)
-            }
-            if (stat.starts >= 2) {
-                HourStatChip(stat.completedMinutes, stat.starts)
-                Spacer(modifier = Modifier.height(12.dp))
-            }
+            Spacer(modifier = Modifier.height(16.dp))
 
-            FilledTonalButton(
-                onClick = onAddFiveMin,
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.height(48.dp)
+            // Center: Circular Progress Ring (Screenshot 3)
+            Box(
+                modifier = Modifier
+                    .size(290.dp)
+                    .padding(8.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = stringResource(R.string.add_five_min),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val strokeWidth = 12.dp.toPx()
+                    // Track
+                    drawCircle(
+                        color = Color(0xFF383740),
+                        style = Stroke(width = strokeWidth)
+                    )
+                    // Progress arc
+                    val sweepAngle = 360f * progress
+                    drawArc(
+                        color = Color(0xFFFFFFFF),
+                        startAngle = -90f,
+                        sweepAngle = sweepAngle,
+                        useCenter = false,
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                    )
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = formattedTime,
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontSize = 68.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = (-1).sp
+                        ),
+                        color = Color(0xFFFFFFFF)
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    IconButton(
+                        onClick = if (timer.isRunning && !timer.isPaused) onPause else onStart,
+                        modifier = Modifier.size(54.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (timer.isRunning && !timer.isPaused) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (timer.isRunning) stringResource(R.string.pause) else stringResource(R.string.resume),
+                            tint = Color(0xFFFFFFFF),
+                            modifier = Modifier.size(42.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // Bottom row inside card: +5:00 pill button on left, Reset circular button on right
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Reset Button
-                FilledTonalIconButton(
-                    onClick = if (timer.remainingMillis != timer.initialDurationMillis) onReset else onDelete,
-                    modifier = Modifier.size(56.dp),
-                    shape = CircleShape
+                // Wide pill button: +5:00 (Constraint satisfied)
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color(0xFF2C2B33),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .clickable { onAddFiveMin() }
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "+5:00",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFE3E1E9)
+                        )
+                    }
+                }
+
+                // Reset button: Circular Refresh icon
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF2C2B33))
+                        .clickable { onReset() },
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (timer.remainingMillis != timer.initialDurationMillis) Icons.Rounded.Refresh else Icons.Rounded.Delete,
-                        contentDescription = if (timer.remainingMillis != timer.initialDurationMillis) stringResource(R.string.reset) else stringResource(R.string.delete),
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = stringResource(R.string.reset),
+                        tint = Color(0xFFE3E1E9),
                         modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                // Play / Pause Large FAB
-                FloatingActionButton(
-                    onClick = if (timer.isRunning && !timer.isPaused) onPause else onStart,
-                    modifier = Modifier.size(76.dp),
-                    shape = CircleShape,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(
-                        imageVector = if (timer.isRunning && !timer.isPaused) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (timer.isRunning) stringResource(R.string.pause) else stringResource(R.string.resume),
-                        modifier = Modifier.size(38.dp)
-                    )
-                }
-
-                // Delete Button
-                FilledTonalIconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(56.dp),
-                    shape = CircleShape
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Delete,
-                        contentDescription = stringResource(R.string.delete),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RunningTimerCard(
-    timer: TimerModel,
-    timerManager: TimerManager,
-    onStart: () -> Unit,
-    onPause: () -> Unit,
-    onReset: () -> Unit,
-    onDelete: () -> Unit,
-    onAddFiveMin: () -> Unit,
-    onEditLabel: () -> Unit
-) {
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(timer.isRunning, timer.isPaused, timer.targetEndTimeMillis) {
-        while (isActive && timer.isRunning && !timer.isPaused) {
-            now = System.currentTimeMillis()
-            delay(250)
-        }
-    }
-    ElevatedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp)),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(20.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { onEditLabel() }
-            ) {
-                Text(
-                    text = timer.formattedTime(if (timer.isRunning && !timer.isPaused) now else System.currentTimeMillis()),
-                    style = MaterialTheme.typography.displaySmall.copy(
-                        fontSize = 38.sp,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
-                    Text(
-                        text = if (timer.label.isNotBlank()) timer.label else stringResource(R.string.timer_name_hint),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (timer.label.isNotBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Rounded.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    )
-                }
-                val runs by timerManager.runs.collectAsState()
-                val stat = remember(runs, timer.originDurationMillis) {
-                    timerManager.hourStat(timer.originDurationMillis)
-                }
-                if (stat.starts >= 2) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    HourStatChip(stat.completedMinutes, stat.starts)
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // +5:00
-                FilledTonalButton(
-                    onClick = onAddFiveMin,
-                    shape = RoundedCornerShape(18.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(stringResource(R.string.add_five_min), fontWeight = FontWeight.Bold)
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Play / Pause
-                IconButton(
-                    onClick = if (timer.isRunning && !timer.isPaused) onPause else onStart
-                ) {
-                    Icon(
-                        imageVector = if (timer.isRunning && !timer.isPaused) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                // Delete
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Rounded.Delete,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error
                     )
                 }
             }

@@ -209,7 +209,14 @@ data class AlarmModel(
             }
         }
 
-        if (daysOfWeek.isEmpty()) return context.getString(R.string.once)
+        if (daysOfWeek.isEmpty()) {
+            val nextDate = LocalDate.now().let { today ->
+                val atToday = LocalDateTime.of(today, LocalTime.of(hour, minute, 0))
+                if (atToday.isAfter(LocalDateTime.now())) today else today.plusDays(1)
+            }
+            return if (nextDate == LocalDate.now()) context.getString(R.string.today)
+            else context.getString(R.string.tomorrow)
+        }
         if (daysOfWeek.size == 7) return context.getString(R.string.every_day)
         if (daysOfWeek == setOf(1, 2, 3, 4, 5)) return context.getString(R.string.weekdays)
         if (daysOfWeek == setOf(6, 7)) return context.getString(R.string.weekends)

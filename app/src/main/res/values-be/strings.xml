@@ -76,4 +76,18 @@
     <string name="collapse">Згарнуць</string>
     <string name="expand">Разгарнуць</string>
     <string name="toggle_mode">Змяніць рэжым</string>
+
+    <string name="edit">Рэдагаваць</string>
+    <string name="upcoming_alarm">Надыходзячы будзільнік</string>
+    <string name="set_alarm_date">Усталяваць дату</string>
+    <string name="alarm_name_title">Назва будзільніка</string>
+    <string name="timer_start">Пачаць</string>
+    <string name="hours_label">Гадзіны</string>
+    <string name="mins_label">Хвіліны</string>
+    <string name="secs_label">Секунды</string>
+    <string name="close">Закрыць</string>
+    <string name="timer_for_five_min">Таймер на 5 хв</string>
+
+    <string name="today">Сёння</string>
+    <string name="tomorrow">Заўтра</string>
 </resources>

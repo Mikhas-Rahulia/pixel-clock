@@ -76,4 +76,18 @@
     <string name="collapse">Inklappen</string>
     <string name="expand">Uitklappen</string>
     <string name="toggle_mode">Modus wisselen</string>
+
+    <string name="edit">Bewerken</string>
+    <string name="upcoming_alarm">Aankomende wekker</string>
+    <string name="set_alarm_date">Datum instellen</string>
+    <string name="alarm_name_title">Naam van de wekker</string>
+    <string name="timer_start">Starten</string>
+    <string name="hours_label">Uren</string>
+    <string name="mins_label">Minuten</string>
+    <string name="secs_label">Seconden</string>
+    <string name="close">Sluiten</string>
+    <string name="timer_for_five_min">Timer voor 5 min</string>
+
+    <string name="today">Vandaag</string>
+    <string name="tomorrow">Morgen</string>
 </resources>

@@ -76,4 +76,18 @@
     <string name="collapse">Zwiń</string>
     <string name="expand">Rozwiń</string>
     <string name="toggle_mode">Zmień tryb</string>
+
+    <string name="edit">Edytuj</string>
+    <string name="upcoming_alarm">Nadchodzący alarm</string>
+    <string name="set_alarm_date">Ustaw alarm</string>
+    <string name="alarm_name_title">Nazwa alarmu</string>
+    <string name="timer_start">Rozpocznij</string>
+    <string name="hours_label">Godziny</string>
+    <string name="mins_label">Minuty</string>
+    <string name="secs_label">Sekundy</string>
+    <string name="close">Zamknij</string>
+    <string name="timer_for_five_min">Minutnik na 5 min</string>
+
+    <string name="today">Dzisiaj</string>
+    <string name="tomorrow">Jutro</string>
 </resources>

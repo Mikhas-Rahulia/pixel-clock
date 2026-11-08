@@ -76,4 +76,18 @@
     <string name="collapse">Collapse</string>
     <string name="expand">Expand</string>
     <string name="toggle_mode">Toggle mode</string>
+
+    <string name="edit">Edit</string>
+    <string name="upcoming_alarm">Upcoming alarm</string>
+    <string name="set_alarm_date">Set date</string>
+    <string name="alarm_name_title">Alarm name</string>
+    <string name="timer_start">Start</string>
+    <string name="hours_label">Hours</string>
+    <string name="mins_label">Minutes</string>
+    <string name="secs_label">Seconds</string>
+    <string name="close">Close</string>
+    <string name="timer_for_five_min">Timer for 5 min</string>
+
+    <string name="today">Today</string>
+    <string name="tomorrow">Tomorrow</string>
 </resources>
