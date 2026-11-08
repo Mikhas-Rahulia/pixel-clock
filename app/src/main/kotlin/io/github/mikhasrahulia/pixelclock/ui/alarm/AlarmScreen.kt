@@ -175,7 +175,7 @@ fun AlarmScreen(
                         .fillMaxSize()
                         .weight(1f),
                     contentPadding = PaddingValues(bottom = 88.dp, top = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(alarms, key = { it.id }) { alarm ->
                         val isExpanded = expandedAlarmId == alarm.id
@@ -536,50 +536,43 @@ fun ExpressiveAlarmCard(
         modifier = modifier
             .fillMaxWidth()
             .animateContentSize(spring(stiffness = Spring.StiffnessMedium))
-            .clip(RoundedCornerShape(26.dp))
+            .clip(RoundedCornerShape(24.dp))
             // Only a collapsed card expands on tap. Taps inside an open card must not collapse it.
             .clickable(enabled = !isExpanded) { onToggleExpand() },
-        shape = RoundedCornerShape(26.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.elevatedCardColors(
             containerColor = if (alarm.isEnabled) MaterialTheme.colorScheme.surfaceContainerHigh
             else MaterialTheme.colorScheme.surfaceContainer
         ),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (alarm.isEnabled) 2.dp else 1.dp)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             // Main Top Row
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable(enabled = isExpanded) { onToggleExpand() },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { onEditTime() }
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text(
                         text = formattedTime,
                         style = MaterialTheme.typography.displayMedium.copy(
-                            fontSize = 54.sp,
+                            fontSize = 44.sp,
                             fontWeight = FontWeight.Bold
                         ),
                         color = if (alarm.isEnabled) MaterialTheme.colorScheme.onSurface
-                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onEditTime() }
                     )
 
                     Spacer(modifier = Modifier.height(2.dp))
-
-                    if (alarm.label.isNotBlank() && !alarm.label.equals(daysSummary, ignoreCase = true)) {
-                        Text(
-                            text = alarm.label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
 
                     val scheduleText = if (alarm.isBiWeekly) {
                         "${stringResource(R.string.repeat_biweekly)} ($daysSummary)"
@@ -587,78 +580,74 @@ fun ExpressiveAlarmCard(
                         daysSummary
                     }
 
+                    val hasLabel = alarm.label.isNotBlank() && !alarm.label.equals(daysSummary, ignoreCase = true)
+                    val subtitleText = if (hasLabel) {
+                        "${alarm.label}  ·  $scheduleText"
+                    } else {
+                        scheduleText
+                    }
+
                     Text(
-                        text = scheduleText,
+                        text = subtitleText,
                         style = MaterialTheme.typography.bodyMedium,
                         color = when {
                             !alarm.isEnabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                             alarm.isBiWeekly -> MaterialTheme.colorScheme.tertiary
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         },
-                        fontWeight = if (alarm.isEnabled && alarm.isBiWeekly) FontWeight.Bold else FontWeight.Normal
+                        fontWeight = if (alarm.isEnabled && alarm.isBiWeekly) FontWeight.Bold else FontWeight.Normal,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
 
                     if (alarm.isEnabled && pauseText != null) {
                         Text(
                             text = pauseText,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.secondary
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.padding(top = 2.dp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                    }
-
-                    if (alarm.isEnabled && nextOccurrence.isNotBlank()) {
+                    } else if (alarm.isEnabled && nextOccurrence.isNotBlank()) {
                         Text(
                             text = nextOccurrence,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                            modifier = Modifier.padding(top = 2.dp)
+                            modifier = Modifier.padding(top = 2.dp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                Switch(
-                    checked = alarm.isEnabled,
-                    onCheckedChange = onToggleEnabled,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                        checkedTrackColor = MaterialTheme.colorScheme.primary
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Switch(
+                        checked = alarm.isEnabled,
+                        onCheckedChange = onToggleEnabled,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary
+                        )
                     )
-                )
-            }
 
-            // Obvious, labelled entry to day / repeat / name settings
-            FilledTonalButton(
-                onClick = onToggleExpand,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp)
-                    .height(52.dp),
-                shape = RoundedCornerShape(26.dp),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = if (alarm.isEnabled) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceContainerHighest,
-                    contentColor = if (alarm.isEnabled) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Tune,
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = stringResource(R.string.customize),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Icon(
-                    imageVector = if (isExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp)
-                )
+                    IconButton(
+                        onClick = onToggleExpand,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            tint = if (alarm.isEnabled) MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
             }
 
             // Expanded Details Section
@@ -667,7 +656,7 @@ fun ExpressiveAlarmCard(
                 enter = fadeIn(spring(stiffness = Spring.StiffnessHigh)) + expandVertically(spring(stiffness = Spring.StiffnessMedium)),
                 exit = fadeOut(spring(stiffness = Spring.StiffnessHigh)) + shrinkVertically(spring(stiffness = Spring.StiffnessMedium))
             ) {
-                Column(modifier = Modifier.padding(top = 8.dp)) {
+                Column(modifier = Modifier.padding(top = 10.dp)) {
                     // Direct inline Label Field (Edit directly right on card!)
                     OutlinedTextField(
                         value = alarm.label,
