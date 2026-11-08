@@ -490,45 +490,79 @@ fun ExpressiveTimePickerDialog(
         initialMinute = initialMinute,
         is24Hour = is24Hour
     )
+    // Default to clock menu (dial), not keyboard
+    var isKeyboardMode by remember { mutableStateOf(false) }
 
     PredictiveBackLayer(onDismiss = onDismiss) {
         Surface(
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             modifier = Modifier
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = 16.dp)
                 .fillMaxWidth()
         ) {
             Column(
                 modifier = Modifier
-                    .padding(24.dp)
+                    .padding(horizontal = 20.dp, vertical = 20.dp)
                     .imePadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = stringResource(R.string.select_time),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 20.dp)
-                )
-
-                TimeInput(
-                    state = timePickerState,
-                    colors = TimePickerDefaults.colors(
-                        timeSelectorSelectedContainerColor = Color(0xFF35343C),
-                        timeSelectorSelectedContentColor = Color(0xFFFFFFFF),
-                        timeSelectorUnselectedContainerColor = Color(0xFF25242C),
-                        timeSelectorUnselectedContentColor = Color(0xFF8E8D96)
+                        .padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.select_time),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                )
+                    IconButton(
+                        onClick = { isKeyboardMode = !isKeyboardMode },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isKeyboardMode) Icons.Rounded.Schedule else Icons.Rounded.Keyboard,
+                            contentDescription = stringResource(R.string.toggle_mode),
+                            tint = Color(0xFFE3E1E9)
+                        )
+                    }
+                }
+
+                if (isKeyboardMode) {
+                    TimeInput(
+                        state = timePickerState,
+                        colors = TimePickerDefaults.colors(
+                            timeSelectorSelectedContainerColor = Color(0xFF35343C),
+                            timeSelectorSelectedContentColor = Color(0xFFFFFFFF),
+                            timeSelectorUnselectedContainerColor = Color(0xFF25242C),
+                            timeSelectorUnselectedContentColor = Color(0xFF8E8D96)
+                        )
+                    )
+                } else {
+                    TimePicker(
+                        state = timePickerState,
+                        colors = TimePickerDefaults.colors(
+                            clockDialColor = Color(0xFF28272F),
+                            selectorColor = Color(0xFFFFFFFF),
+                            containerColor = Color(0xFF1E1E24),
+                            clockDialSelectedContentColor = Color(0xFF191C20),
+                            clockDialUnselectedContentColor = Color(0xFFE3E1E9),
+                            timeSelectorSelectedContainerColor = Color(0xFF35343C),
+                            timeSelectorSelectedContentColor = Color(0xFFFFFFFF),
+                            timeSelectorUnselectedContainerColor = Color(0xFF25242C),
+                            timeSelectorUnselectedContentColor = Color(0xFF8E8D96)
+                        )
+                    )
+                }
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 24.dp),
+                        .padding(top = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
