@@ -536,17 +536,17 @@ fun ExpressiveAlarmCard(
         modifier = modifier
             .fillMaxWidth()
             .animateContentSize(spring(stiffness = Spring.StiffnessMedium))
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(22.dp))
             // Only a collapsed card expands on tap. Taps inside an open card must not collapse it.
             .clickable(enabled = !isExpanded) { onToggleExpand() },
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.elevatedCardColors(
             containerColor = if (alarm.isEnabled) MaterialTheme.colorScheme.surfaceContainerHigh
             else MaterialTheme.colorScheme.surfaceContainer
         ),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (alarm.isEnabled) 2.dp else 1.dp)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Column(modifier = Modifier.padding(start = 20.dp, end = 16.dp, top = 14.dp, bottom = 14.dp)) {
             // Main Top Row
             Row(
                 modifier = Modifier
@@ -610,15 +610,6 @@ fun ExpressiveAlarmCard(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                    } else if (alarm.isEnabled && nextOccurrence.isNotBlank()) {
-                        Text(
-                            text = nextOccurrence,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                            modifier = Modifier.padding(top = 2.dp),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
                     }
                 }
 
@@ -661,7 +652,9 @@ fun ExpressiveAlarmCard(
                     OutlinedTextField(
                         value = alarm.label,
                         onValueChange = { onUpdateAlarm(alarm.copy(label = it)) },
-                        singleLine = true,
+                        singleLine = false,
+                        minLines = 1,
+                        maxLines = 3,
                         placeholder = { Text(stringResource(R.string.alarm_name_hint)) },
                         leadingIcon = {
                             Icon(
