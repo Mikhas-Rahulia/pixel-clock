@@ -4,6 +4,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import kotlin.math.hypot
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
@@ -199,21 +204,9 @@ fun AlarmScreen(
             }
         }
 
-        // FAB + (Creates new alarm and immediately expands it in-place)
+        // FAB + (Opens time picker dialog to choose time and create alarm)
         FloatingActionButton(
-            onClick = {
-                val nextSlot = AlarmModel.nextHourSlot()
-                val newAlarm = AlarmModel(
-                    hour = nextSlot.hour,
-                    minute = nextSlot.minute,
-                    daysOfWeek = emptySet(),
-                    specificDate = nextSlot.format(DateTimeFormatter.ISO_LOCAL_DATE),
-                    isEnabled = true
-                )
-                repository.addAlarm(newAlarm)
-                scheduler.scheduleAlarm(newAlarm)
-                expandedAlarmId = newAlarm.id
-            },
+            onClick = { isCreatingAlarm = true },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 20.dp, bottom = 20.dp)
@@ -231,6 +224,29 @@ fun AlarmScreen(
     }
 
 
+
+    if (isCreatingAlarm) {
+        val nextSlot = remember { AlarmModel.nextHourSlot() }
+        ExpressiveTimePickerDialog(
+            initialHour = nextSlot.hour,
+            initialMinute = nextSlot.minute,
+            onConfirm = { hour, minute ->
+                val date = AlarmModel.oneTimeDate(hour, minute)
+                val newAlarm = AlarmModel(
+                    hour = hour,
+                    minute = minute,
+                    daysOfWeek = emptySet(),
+                    specificDate = date.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                    isEnabled = true
+                )
+                repository.addAlarm(newAlarm)
+                scheduler.scheduleAlarm(newAlarm)
+                expandedAlarmId = newAlarm.id
+                isCreatingAlarm = false
+            },
+            onDismiss = { isCreatingAlarm = false }
+        )
+    }
 
     editingTimeAlarm?.let { alarmToEdit ->
         ExpressiveTimePickerDialog(
@@ -341,38 +357,60 @@ fun ExpressiveAlarmCard(
     }
 
     val cardShape = RoundedCornerShape(28.dp)
-    val collapsedContainerColor = if (alarm.isEnabled) Color(0xFFE2E2E9) else Color(0xFF1E1E24)
-    val expandedContainerColor = Color(0xFF1E1E24)
+    val collapsedBg = if (alarm.isEnabled) Color(0xFFDEDEE6) else Color(0xFF1E1E24)
+    val expandedBg = Color(0xFF1E1E24)
 
-    // Smooth quick 200ms animated transition between white card and grey card on tap
-    val targetContainerColor = if (isExpanded) expandedContainerColor else collapsedContainerColor
-    val animatedContainerColor by animateColorAsState(
-        targetValue = targetContainerColor,
-        animationSpec = tween(durationMillis = 200),
-        label = "alarmCardContainerColor"
+    var tapCenter by remember { mutableStateOf<Offset?>(null) }
+    val revealProgress by animateFloatAsState(
+        targetValue = if (isExpanded) 1f else 0f,
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "alarmReveal"
     )
 
-    val targetContentColor = if (isExpanded) Color(0xFFE3E1E9) else if (alarm.isEnabled) Color(0xFF191C20) else Color(0xFF8E8D96)
-    val animatedContentColor by animateColorAsState(
-        targetValue = targetContentColor,
-        animationSpec = tween(durationMillis = 200),
-        label = "alarmCardContentColor"
+    val contentProgress by animateFloatAsState(
+        targetValue = if (isExpanded) 1f else 0f,
+        animationSpec = tween(durationMillis = 140),
+        label = "alarmContentProgress"
     )
+    val collapsedContentColor = if (alarm.isEnabled) Color(0xFF191C20) else Color(0xFF8E8D96)
+    val expandedContentColor = Color(0xFFE3E1E9)
+    val animatedContentColor = androidx.compose.ui.graphics.lerp(collapsedContentColor, expandedContentColor, contentProgress)
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .clip(cardShape)
-            .animateContentSize(spring(stiffness = Spring.StiffnessMedium)),
+            .animateContentSize(spring(stiffness = Spring.StiffnessMedium))
+            .drawBehind {
+                if (!alarm.isEnabled) {
+                    drawRect(expandedBg)
+                } else {
+                    drawRect(collapsedBg)
+                    if (revealProgress > 0f) {
+                        val center = tapCenter ?: Offset(size.width / 2f, size.height / 2f)
+                        val maxRadius = hypot(size.width, size.height)
+                        drawCircle(
+                            color = expandedBg,
+                            radius = maxRadius * revealProgress,
+                            center = center
+                        )
+                    }
+                }
+            },
         shape = cardShape,
-        color = animatedContainerColor
+        color = Color.Transparent
     ) {
         if (!isExpanded) {
             // Collapsed Card Layout (Google Clock M3E Screenshot 1)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onToggleExpand() }
+                    .pointerInput(Unit) {
+                        detectTapGestures { offset ->
+                            tapCenter = offset
+                            onToggleExpand()
+                        }
+                    }
                     .padding(horizontal = 24.dp, vertical = 20.dp)
             ) {
                 val scheduleText = if (alarm.isBiWeekly) {
@@ -450,7 +488,12 @@ fun ExpressiveAlarmCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onToggleExpand() }
+                        .pointerInput(Unit) {
+                            detectTapGestures { offset ->
+                                tapCenter = offset
+                                onToggleExpand()
+                            }
+                        }
                         .padding(bottom = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
