@@ -15,7 +15,7 @@
     <string name="plus_5_min">+5 min</string>
     <string name="repeat_weekly">Semanal</string>
     <string name="repeat_biweekly">Cada 2 semanas</string>
-    <string name="shift_cycle">Mover 1 sem.</string>
+    <string name="shift_cycle">Mover 2 semanas</string>
     <string name="active_this_week">Activa esta semana</string>
     <string name="active_next_week">Activa próxima semana</string>
     <string name="pause_title">Pausar alarma</string>

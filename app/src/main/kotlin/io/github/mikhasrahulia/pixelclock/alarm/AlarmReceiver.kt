@@ -20,6 +20,13 @@ class AlarmReceiver : BroadcastReceiver() {
 
         when (action) {
             AlarmScheduler.ACTION_ALARM_FIRE -> {
+                val now = System.currentTimeMillis()
+                if (alarmId.isNotEmpty() && alarmId == lastFiredAlarmId && (now - lastFiredTimestamp) < 3000L) {
+                    Log.w(TAG, "Ignoring duplicate alarm fire for $alarmId within 3s")
+                    return
+                }
+                lastFiredAlarmId = alarmId
+                lastFiredTimestamp = now
                 // 1. Start AlarmService (sound & vibration & ongoing notification)
                 val serviceIntent = Intent(context, AlarmService::class.java).apply {
                     putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
@@ -103,5 +110,7 @@ class AlarmReceiver : BroadcastReceiver() {
 
     companion object {
         const val TAG = "AlarmReceiver"
+        @Volatile private var lastFiredAlarmId: String? = null
+        @Volatile private var lastFiredTimestamp: Long = 0L
     }
 }

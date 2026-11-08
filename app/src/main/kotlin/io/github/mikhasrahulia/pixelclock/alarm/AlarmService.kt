@@ -68,6 +68,7 @@ class AlarmService : Service() {
     }
 
     private fun startAlarmAudio() {
+        if (mediaPlayer?.isPlaying == true || fallbackRingtone?.isPlaying == true) return
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
         // Request transient exclusive audio focus for alarm

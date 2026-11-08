@@ -14,8 +14,8 @@
     <string name="add_five_min">+5:00</string>
     <string name="plus_5_min">+5 хв</string>
     <string name="repeat_weekly">Штотыдзень</string>
-    <string name="repeat_biweekly">Раз у 2 тыдні</string>
-    <string name="shift_cycle">Зрух на 1 тыдзень</string>
+    <string name="repeat_biweekly">Кожныя 2 тыдні</string>
+    <string name="shift_cycle">Зрух на 2 тыдні</string>
     <string name="active_this_week">Актыўны на гэтым тыдні</string>
     <string name="active_next_week">Актыўны на наступным тыдні</string>
     <string name="pause_title">Паўза будзільніка</string>

@@ -414,11 +414,12 @@ fun ExpressiveAlarmCard(
         label = "alarmCardContainerColor"
     )
 
-    val primaryTextColor = if (isLightCard) Color(0xFF191C20) else Color(0xFFE3E1E9)
-    val secondaryTextColor = if (isLightCard) Color(0xFF49454F) else Color(0xFF8E8D96)
+    // Enabled alarms are light with dark high-contrast text (#191C20); Disabled alarms are muted dark grey with soft grey text (#75747D) - NEVER bright white!
+    val primaryTextColor = if (isLightCard) Color(0xFF191C20) else Color(0xFF75747D)
+    val secondaryTextColor = if (isLightCard) Color(0xFF49454F) else Color(0xFF55545D)
     val chipBg = if (isLightCard) Color(0xFFCECED8) else Color(0xFF28272F)
     val pillDarkBg = if (isLightCard) Color(0xFF2E2D35) else Color(0xFF33323B)
-    val pillDarkText = Color(0xFFFFFFFF)
+    val pillDarkText = if (isLightCard) Color(0xFFFFFFFF) else Color(0xFFC6C5D0)
 
     var tapCenter by remember { mutableStateOf<Offset?>(null) }
     var touchAnim by remember { mutableStateOf(false) }
@@ -586,80 +587,20 @@ fun ExpressiveAlarmCard(
                         color = primaryTextColor,
                         modifier = Modifier.clickable { onEditTime() }
                     )
-                    Column(
-                        horizontalAlignment = Alignment.End
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = pillDarkBg,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { onEditTime() }
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = pillDarkBg,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .clickable { onEditTime() }
-                        ) {
-                            Text(
-                                text = stringResource(R.string.edit),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = pillDarkText,
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
-                            )
-                        }
-
-                        // Circular < and > buttons placed directly below Edytuj (Image 4)
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(CircleShape)
-                                    .background(pillDarkBg)
-                                    .clickable {
-                                        if (!cardRepeating) {
-                                            val day = cardPreview ?: AlarmModel.oneTimeDate(alarm.hour, alarm.minute).dayOfWeek.value
-                                            onUpdateAlarm(alarm.copy(daysOfWeek = setOf(day), specificDate = null, isBiWeekly = true))
-                                        } else if (!alarm.isBiWeekly) {
-                                            onUpdateAlarm(alarm.copy(isBiWeekly = true))
-                                        } else {
-                                            onShiftCycle()
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-                                    contentDescription = stringResource(R.string.shift_cycle),
-                                    tint = if (alarm.isBiWeekly) Color(0xFFE3E1E9) else Color(0xFF8E8D96),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(CircleShape)
-                                    .background(pillDarkBg)
-                                    .clickable {
-                                        if (!cardRepeating) {
-                                            val day = cardPreview ?: AlarmModel.oneTimeDate(alarm.hour, alarm.minute).dayOfWeek.value
-                                            onUpdateAlarm(alarm.copy(daysOfWeek = setOf(day), specificDate = null, isBiWeekly = true))
-                                        } else if (!alarm.isBiWeekly) {
-                                            onUpdateAlarm(alarm.copy(isBiWeekly = true))
-                                        } else {
-                                            onShiftCycle()
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                    contentDescription = stringResource(R.string.shift_cycle),
-                                    tint = if (alarm.isBiWeekly) Color(0xFFE3E1E9) else Color(0xFF8E8D96),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
+                        Text(
+                            text = stringResource(R.string.edit),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = pillDarkText,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                        )
                     }
                 }
 
@@ -699,12 +640,19 @@ fun ExpressiveAlarmCard(
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = stringResource(R.string.repeat_biweekly),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = primaryTextColor
-                                )
+                                Column {
+                                    Text(
+                                        text = stringResource(R.string.repeat_biweekly),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = primaryTextColor
+                                    )
+                                    Text(
+                                        text = if (alarm.isBiWeekly) stringResource(R.string.repeat_biweekly) else stringResource(R.string.repeat_weekly),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = secondaryTextColor
+                                    )
+                                }
                             }
                             Switch(
                                 checked = alarm.isBiWeekly,

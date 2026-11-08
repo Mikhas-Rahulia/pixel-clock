@@ -14,8 +14,8 @@
     <string name="add_five_min">+5:00</string>
     <string name="plus_5_min">+5 мин</string>
     <string name="repeat_weekly">Каждую неделю</string>
-    <string name="repeat_biweekly">Раз в 2 недели</string>
-    <string name="shift_cycle">Сдвиг на 1 нед.</string>
+    <string name="repeat_biweekly">Каждые 2 недели</string>
+    <string name="shift_cycle">Сдвиг на 2 недели</string>
     <string name="active_this_week">Активен на этой неделе</string>
     <string name="active_next_week">Активен на следующей неделе</string>
     <string name="pause_title">Пауза будильника</string>

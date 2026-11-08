@@ -33,11 +33,28 @@ class AlarmRepository(private val context: Context) {
             list = fromBackup
         }
 
-        _alarms.value = list
-        saveAlarms(list)
+        val cleaned = deduplicateAlarms(list)
+        _alarms.value = cleaned
+        saveAlarms(cleaned)
         if (prefs.getInt(AlarmBackup.KEY_SCHEMA, 0) < AlarmBackup.SCHEMA_VERSION) {
             prefs.edit().putInt(AlarmBackup.KEY_SCHEMA, AlarmBackup.SCHEMA_VERSION).apply()
         }
+    }
+
+    private fun deduplicateAlarms(list: List<AlarmModel>): List<AlarmModel> {
+        val seen = mutableSetOf<String>()
+        val result = mutableListOf<AlarmModel>()
+        for (alarm in list) {
+            if (!alarm.isRepeating && alarm.label.isBlank()) {
+                val key = "${alarm.hour}:${alarm.minute}:${alarm.specificDate}"
+                if (seen.add(key)) {
+                    result.add(alarm)
+                }
+            } else {
+                result.add(alarm)
+            }
+        }
+        return result
     }
 
     private fun saveAlarms(list: List<AlarmModel>) {
@@ -51,8 +68,9 @@ class AlarmRepository(private val context: Context) {
     }
 
     fun replaceAll(list: List<AlarmModel>) {
-        _alarms.value = list
-        saveAlarms(list)
+        val cleaned = deduplicateAlarms(list)
+        _alarms.value = cleaned
+        saveAlarms(cleaned)
     }
 
     fun addAlarm(alarm: AlarmModel) {
