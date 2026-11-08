@@ -33,6 +33,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -258,70 +261,60 @@ fun ExpressiveNavBar(
     onTabSelected: (AppTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
+    Row(
         modifier = modifier
-            .padding(horizontal = 24.dp, vertical = 12.dp)
+            .padding(horizontal = 24.dp, vertical = 8.dp)
             .fillMaxWidth()
-            .height(64.dp),
-        shape = RoundedCornerShape(32.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 3.dp,
-        shadowElevation = 8.dp
+            .height(56.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .padding(6.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AppTab.entries.forEach { tab ->
-                val isSelected = selectedTab == tab
-                val containerColor by animateColorAsState(
-                    targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                    animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
-                    label = "tabColor"
-                )
-                val contentColor by animateColorAsState(
-                    targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                    animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
-                    label = "tabTextColor"
-                )
-                val tabScale by animateFloatAsState(
-                    targetValue = if (isSelected) 1f else 0.94f,
-                    animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
-                    label = "tabScale"
-                )
-                val tabTitle = stringResource(tab.titleRes)
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                        .scale(tabScale)
-                        .clip(RoundedCornerShape(26.dp))
-                        .background(containerColor)
-                        .clickable { onTabSelected(tab) },
-                    contentAlignment = Alignment.Center
+        AppTab.entries.forEach { tab ->
+            val isSelected = selectedTab == tab
+            val containerColor by animateColorAsState(
+                targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
+                label = "tabColor"
+            )
+            val contentColor by animateColorAsState(
+                targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
+                label = "tabTextColor"
+            )
+            val tabScale by animateFloatAsState(
+                targetValue = if (isSelected) 1f else 0.94f,
+                animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
+                label = "tabScale"
+            )
+            val tabTitle = stringResource(tab.titleRes)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+                    .scale(tabScale)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(containerColor)
+                    .clickable { onTabSelected(tab) },
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        NavTabIcon(
-                            tab = tab,
-                            selected = isSelected,
-                            tint = contentColor,
-                            description = tabTitle
+                    NavTabIcon(
+                        tab = tab,
+                        selected = isSelected,
+                        tint = contentColor,
+                        description = tabTitle
+                    )
+                    if (isSelected) {
+                        Text(
+                            text = tabTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = contentColor,
+                            modifier = Modifier.padding(start = 8.dp)
                         )
-                        if (isSelected) {
-                            Text(
-                                text = tabTitle,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = contentColor,
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
-                        }
                     }
                 }
             }
@@ -338,76 +331,85 @@ fun PredictiveBackLayer(
     onDismiss: () -> Unit,
     content: @Composable () -> Unit
 ) {
-    val gate = LocalModalGate.current
-    DisposableEffect(Unit) {
-        gate.enter()
-        onDispose { gate.exit() }
-    }
-
-    val progress = remember { Animatable(0f) }
-    var fromLeft by remember { mutableStateOf(true) }
-    PredictiveBackHandler(enabled = true) { events ->
-        try {
-            events.collect { event ->
-                fromLeft = event.swipeEdge != BackEventCompat.EDGE_RIGHT
-                progress.snapTo(event.progress.coerceIn(0f, 1f))
-            }
-            onDismiss()
-        } catch (e: CancellationException) {
-            progress.animateTo(
-                targetValue = 0f,
-                animationSpec = spring(
-                    dampingRatio = 0.62f,
-                    stiffness = Spring.StiffnessMedium
-                )
-            )
-            throw e
-        }
-    }
-
-    // Springy entrance: the card pops up from slightly smaller and slightly lower.
-    val entrance = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        entrance.animateTo(
-            targetValue = 1f,
-            animationSpec = spring(dampingRatio = 0.68f, stiffness = Spring.StiffnessMediumLow)
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
         )
-    }
-    val emphasized = run {
-        val raw = progress.value
-        1f - (1f - raw) * (1f - raw)
-    }
-    val scrimClick = remember { MutableInteractionSource() }
-    val cardClick = remember { MutableInteractionSource() }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .navigationBarsPadding()
-            .background(
-                Color.Black.copy(
-                    alpha = 0.62f * (1f - emphasized * 1.4f).coerceIn(0f, 1f) * entrance.value.coerceIn(0f, 1f)
-                )
-            )
-            .clickable(interactionSource = scrimClick, indication = null, onClick = onDismiss),
-        contentAlignment = Alignment.Center
     ) {
+        val gate = LocalModalGate.current
+        DisposableEffect(Unit) {
+            gate.enter()
+            onDispose { gate.exit() }
+        }
+
+        val progress = remember { Animatable(0f) }
+        var fromLeft by remember { mutableStateOf(true) }
+        PredictiveBackHandler(enabled = true) { events ->
+            try {
+                events.collect { event ->
+                    fromLeft = event.swipeEdge != BackEventCompat.EDGE_RIGHT
+                    progress.snapTo(event.progress.coerceIn(0f, 1f))
+                }
+                onDismiss()
+            } catch (e: CancellationException) {
+                progress.animateTo(
+                    targetValue = 0f,
+                    animationSpec = spring(
+                        dampingRatio = 0.62f,
+                        stiffness = Spring.StiffnessMedium
+                    )
+                )
+                throw e
+            }
+        }
+
+        // Springy entrance: the card pops up from slightly smaller and slightly lower.
+        val entrance = remember { Animatable(0f) }
+        LaunchedEffect(Unit) {
+            entrance.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(dampingRatio = 0.68f, stiffness = Spring.StiffnessMediumLow)
+            )
+        }
+        val emphasized = run {
+            val raw = progress.value
+            1f - (1f - raw) * (1f - raw)
+        }
+        val scrimClick = remember { MutableInteractionSource() }
+        val cardClick = remember { MutableInteractionSource() }
+
         Box(
             modifier = Modifier
-                .graphicsLayer {
-                    val pop = entrance.value
-                    val scale = (0.86f + 0.14f * pop) - 0.38f * emphasized
-                    scaleX = scale
-                    scaleY = scale
-                    translationX = (if (fromLeft) 120.dp else (-120).dp).toPx() * emphasized
-                    translationY = 72.dp.toPx() * emphasized + 56.dp.toPx() * (1f - pop)
-                    alpha = (pop.coerceIn(0f, 1f)) * (1f - 0.2f * emphasized)
-                    shape = RoundedCornerShape((28 + 28 * emphasized).dp)
-                    clip = true
-                }
-                .clickable(interactionSource = cardClick, indication = null, onClick = {})
+                .fillMaxSize()
+                .background(
+                    Color.Black.copy(
+                        alpha = 0.62f * (1f - emphasized * 1.4f).coerceIn(0f, 1f) * entrance.value.coerceIn(0f, 1f)
+                    )
+                )
+                .clickable(interactionSource = scrimClick, indication = null, onClick = onDismiss),
+            contentAlignment = Alignment.Center
         ) {
-            content()
+            Box(
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .graphicsLayer {
+                        val pop = entrance.value
+                        val scale = (0.86f + 0.14f * pop) - 0.38f * emphasized
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = (if (fromLeft) 120.dp else (-120).dp).toPx() * emphasized
+                        translationY = 72.dp.toPx() * emphasized + 56.dp.toPx() * (1f - pop)
+                        alpha = (pop.coerceIn(0f, 1f)) * (1f - 0.2f * emphasized)
+                        shape = RoundedCornerShape((28 + 28 * emphasized).dp)
+                        clip = true
+                    }
+                    .clickable(interactionSource = cardClick, indication = null, onClick = {})
+            ) {
+                content()
+            }
         }
     }
 }

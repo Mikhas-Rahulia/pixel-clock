@@ -378,7 +378,7 @@ fun CreateOrEditAlarmDialog(
                     ) {
                         Icon(
                             imageVector = if (isKeyboardMode) Icons.Rounded.Schedule else Icons.Rounded.Keyboard,
-                            contentDescription = "Toggle mode",
+                            contentDescription = stringResource(R.string.toggle_mode),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(26.dp)
                         )
@@ -630,7 +630,7 @@ fun ExpressiveAlarmCard(
                     ) {
                         Icon(
                             imageVector = if (isExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            contentDescription = stringResource(if (isExpanded) R.string.collapse else R.string.expand),
                             tint = if (alarm.isEnabled) MaterialTheme.colorScheme.onSurfaceVariant
                             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.size(24.dp)

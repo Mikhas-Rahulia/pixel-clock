@@ -72,4 +72,8 @@
     <string name="timer_hour_stat">%1$d min · %2$d×</string>
     <string name="timer_alert_channel">Timer done</string>
     <string name="customize">Customize</string>
+
+    <string name="collapse">Collapse</string>
+    <string name="expand">Expand</string>
+    <string name="toggle_mode">Toggle mode</string>
 </resources>
