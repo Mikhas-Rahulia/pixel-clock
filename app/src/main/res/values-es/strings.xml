@@ -50,6 +50,14 @@
     <string name="day_sat">Sáb</string>
     <string name="day_sun">Dom</string>
 
+    <string name="day_mon_initial">L</string>
+    <string name="day_tue_initial">M</string>
+    <string name="day_wed_initial">M</string>
+    <string name="day_thu_initial">J</string>
+    <string name="day_fri_initial">V</string>
+    <string name="day_sat_initial">S</string>
+    <string name="day_sun_initial">D</string>
+
     <string name="hours_unit">h</string>
     <string name="mins_unit">m</string>
     <string name="secs_unit">s</string>

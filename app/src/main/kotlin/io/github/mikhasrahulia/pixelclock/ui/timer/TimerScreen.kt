@@ -71,6 +71,7 @@ import io.github.mikhasrahulia.pixelclock.timer.TimerManager
 import io.github.mikhasrahulia.pixelclock.ui.components.PredictiveBackLayer
 import io.github.mikhasrahulia.pixelclock.ui.components.autoFocusModifier
 import kotlinx.coroutines.isActive
+import java.util.Locale
 
 @Composable
 fun TimerScreen(
@@ -612,14 +613,30 @@ fun RunningTimerCard(
                     )
                 }
 
+                val totalSecs = (currentRemaining.coerceAtLeast(0L) + 999) / 1000
+                val hours = totalSecs / 3600
+                val minutes = (totalSecs % 3600) / 60
+                val seconds = totalSecs % 60
+
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
+                    if (hours > 0) {
+                        Text(
+                            text = String.format(Locale.getDefault(), "%02d", hours),
+                            style = MaterialTheme.typography.displayLarge.copy(
+                                fontSize = 54.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = (-1).sp
+                            ),
+                            color = Color(0xFFFFFFFF)
+                        )
+                    }
                     Text(
-                        text = formattedTime,
+                        text = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds),
                         style = MaterialTheme.typography.displayLarge.copy(
-                            fontSize = 68.sp,
+                            fontSize = if (hours > 0) 64.sp else 86.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = (-1).sp
                         ),
@@ -628,13 +645,13 @@ fun RunningTimerCard(
                     Spacer(modifier = Modifier.height(14.dp))
                     IconButton(
                         onClick = if (timer.isRunning && !timer.isPaused) onPause else onStart,
-                        modifier = Modifier.size(54.dp)
+                        modifier = Modifier.size(56.dp)
                     ) {
                         Icon(
                             imageVector = if (timer.isRunning && !timer.isPaused) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                             contentDescription = if (timer.isRunning) stringResource(R.string.pause) else stringResource(R.string.resume),
                             tint = Color(0xFFFFFFFF),
-                            modifier = Modifier.size(42.dp)
+                            modifier = Modifier.size(46.dp)
                         )
                     }
                 }

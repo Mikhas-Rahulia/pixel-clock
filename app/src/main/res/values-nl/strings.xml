@@ -50,6 +50,14 @@
     <string name="day_sat">Za</string>
     <string name="day_sun">Zo</string>
 
+    <string name="day_mon_initial">M</string>
+    <string name="day_tue_initial">D</string>
+    <string name="day_wed_initial">W</string>
+    <string name="day_thu_initial">D</string>
+    <string name="day_fri_initial">V</string>
+    <string name="day_sat_initial">Z</string>
+    <string name="day_sun_initial">Z</string>
+
     <string name="hours_unit">u</string>
     <string name="mins_unit">m</string>
     <string name="secs_unit">s</string>

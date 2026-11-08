@@ -488,7 +488,7 @@ fun ExpressiveTimePickerDialog(
         initialMinute = initialMinute,
         is24Hour = is24Hour
     )
-    var isKeyboardMode by remember { mutableStateOf(false) }
+    var isKeyboardMode by remember { mutableStateOf(true) }
 
     PredictiveBackLayer(onDismiss = onDismiss) {
         Surface(

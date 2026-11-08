@@ -50,6 +50,14 @@
     <string name="day_sat">Сб</string>
     <string name="day_sun">Нд</string>
 
+    <string name="day_mon_initial">П</string>
+    <string name="day_tue_initial">А</string>
+    <string name="day_wed_initial">С</string>
+    <string name="day_thu_initial">Ч</string>
+    <string name="day_fri_initial">П</string>
+    <string name="day_sat_initial">С</string>
+    <string name="day_sun_initial">Н</string>
+
     <string name="hours_unit">г</string>
     <string name="mins_unit">хв</string>
     <string name="secs_unit">с</string>

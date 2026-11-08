@@ -50,6 +50,14 @@
     <string name="day_sat">Sob</string>
     <string name="day_sun">Niedz</string>
 
+    <string name="day_mon_initial">P</string>
+    <string name="day_tue_initial">W</string>
+    <string name="day_wed_initial">Ś</string>
+    <string name="day_thu_initial">C</string>
+    <string name="day_fri_initial">P</string>
+    <string name="day_sat_initial">S</string>
+    <string name="day_sun_initial">N</string>
+
     <string name="hours_unit">godz.</string>
     <string name="mins_unit">min</string>
     <string name="secs_unit">s</string>
