@@ -3,7 +3,6 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -14,7 +13,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -48,9 +47,10 @@
             </intent-filter>
         </activity>
 
-        <!-- Alarm Ringing Fullscreen Activity -->
+        <!-- Alarm Ringing Fullscreen Activity (Direct Boot aware for overnight Pixel OTA reboots) -->
         <activity
             android:name=".alarm.AlarmRingingActivity"
+            android:directBootAware="true"
             android:exported="false"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
@@ -59,6 +59,7 @@
 
         <activity
             android:name=".timer.TimerRingingActivity"
+            android:directBootAware="true"
             android:exported="false"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
@@ -68,6 +69,7 @@
         <!-- Broadcast Receivers -->
         <receiver
             android:name=".alarm.AlarmReceiver"
+            android:directBootAware="true"
             android:exported="false">
             <intent-filter>
                 <action android:name="io.github.mikhasrahulia.pixelclock.ACTION_ALARM_FIRE" />
@@ -82,6 +84,13 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="io.github.mikhasrahulia.pixelclock.ACTION_TIMER_FIRE" />
+                <action android:name="io.github.mikhasrahulia.pixelclock.ACTION_DISMISS_NOTIFICATION" />
+                <action android:name="io.github.mikhasrahulia.pixelclock.ACTION_TIMER_ADD_FIVE_MIN" />
+                <action android:name="io.github.mikhasrahulia.pixelclock.ACTION_TIMER_ADD_ONE_MIN" />
+                <action android:name="io.github.mikhasrahulia.pixelclock.ACTION_TIMER_PAUSE" />
+                <action android:name="io.github.mikhasrahulia.pixelclock.ACTION_TIMER_RESUME" />
+                <action android:name="io.github.mikhasrahulia.pixelclock.ACTION_TIMER_RESET" />
+                <action android:name="io.github.mikhasrahulia.pixelclock.ACTION_TIMER_STOP_ALERT" />
             </intent-filter>
         </receiver>
 
@@ -101,6 +110,7 @@
         <!-- Foreground Services -->
         <service
             android:name=".timer.TimerService"
+            android:directBootAware="true"
             android:foregroundServiceType="specialUse"
             android:exported="false">
             <property
@@ -110,8 +120,25 @@
 
         <service
             android:name=".alarm.AlarmService"
+            android:directBootAware="true"
             android:foregroundServiceType="mediaPlayback"
             android:exported="false" />
+
+        <!-- Trim unused AndroidX Startup initializers for faster cold start -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+            <meta-data
+                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
     </application>
 

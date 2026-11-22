@@ -29,14 +29,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Backspace
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Clear
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Refresh
+import android.os.SystemClock
+import androidx.activity.compose.BackHandler
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.mikhasrahulia.pixelclock.ui.components.AppIcons
+import kotlinx.coroutines.delay
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,13 +44,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,11 +73,14 @@ fun TimerScreen(
     timerManager: TimerManager,
     modifier: Modifier = Modifier
 ) {
-    val timers by timerManager.timers.collectAsState()
+    val timers by timerManager.timers.collectAsStateWithLifecycle()
     var isAddingTimer by remember { mutableStateOf(false) }
     var editingTimerLabel by remember { mutableStateOf<TimerModel?>(null) }
 
     val showKeypad = timers.isEmpty() || isAddingTimer
+    BackHandler(enabled = isAddingTimer && timers.isNotEmpty()) {
+        isAddingTimer = false
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -150,11 +148,11 @@ fun TimerScreen(
                     .padding(end = 20.dp, bottom = 20.dp)
                     .size(64.dp),
                 shape = RoundedCornerShape(22.dp),
-                containerColor = Color(0xFF35343C),
-                contentColor = Color(0xFFE3E1E9)
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Add,
+                    imageVector = AppIcons.Add,
                     contentDescription = stringResource(R.string.add_timer),
                     modifier = Modifier.size(32.dp)
                 )
@@ -164,11 +162,12 @@ fun TimerScreen(
 
     editingTimerLabel?.let { timerToEdit ->
         var tempLabel by remember(timerToEdit.id) { mutableStateOf(timerToEdit.label) }
+        val colorScheme = MaterialTheme.colorScheme
 
         PredictiveBackLayer(onDismiss = { editingTimerLabel = null }) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
-                color = Color(0xFF1E1E24),
+                color = colorScheme.surfaceContainerHigh,
                 modifier = Modifier
                     .padding(horizontal = 24.dp)
                     .fillMaxWidth()
@@ -178,7 +177,7 @@ fun TimerScreen(
                         text = stringResource(R.string.label),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFFE3E1E9)
+                        color = colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     OutlinedTextField(
@@ -197,12 +196,12 @@ fun TimerScreen(
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(onClick = { editingTimerLabel = null }) {
-                            Text(stringResource(R.string.cancel), color = Color(0xFFE3E1E9))
+                            Text(stringResource(R.string.cancel), color = colorScheme.onSurfaceVariant)
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
                             shape = RoundedCornerShape(18.dp),
-                            color = Color(0xFFFFFFFF),
+                            color = colorScheme.primary,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(18.dp))
                                 .clickable {
@@ -213,7 +212,7 @@ fun TimerScreen(
                             Text(
                                 stringResource(R.string.save),
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF191C20),
+                                color = colorScheme.onPrimary,
                                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
                             )
                         }
@@ -286,10 +285,11 @@ fun GoogleClockKeypadInput(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Preset Chip: ONLY 5 minutes at start! (Constraint satisfied)
+            val colorScheme = MaterialTheme.colorScheme
+            // Preset Chip: 5 minutes quick-start
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = Color(0xFF25242C),
+                color = colorScheme.surfaceContainerHigh,
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
                     .clickable {
@@ -300,17 +300,17 @@ fun GoogleClockKeypadInput(
                     text = "5 min",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFE3E1E9),
+                    color = colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp)
                 )
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Big Start pill button: Rozpocznij
+            // Primary Start pill button
             Surface(
                 shape = RoundedCornerShape(28.dp),
-                color = if (hasTime) Color(0xFF35343C) else Color(0xFF1E1D24),
+                color = if (hasTime) colorScheme.primary else colorScheme.surfaceContainer,
                 modifier = Modifier
                     .fillMaxWidth(0.92f)
                     .height(56.dp)
@@ -330,19 +330,20 @@ fun GoogleClockKeypadInput(
                     Text(
                         text = stringResource(R.string.timer_start),
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (hasTime) Color(0xFFE3E1E9) else Color(0xFF5A5862)
+                        fontWeight = FontWeight.Bold,
+                        color = if (hasTime) colorScheme.onPrimary else colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                 }
             }
         }
 
-        // Clean Numpad Grid (No circular backgrounds!)
+        val numpadScheme = MaterialTheme.colorScheme
+        // Tactile tonal Numpad Grid matching Expressive Material 3 style
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 28.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             val rows = listOf(
@@ -355,17 +356,19 @@ fun GoogleClockKeypadInput(
             rows.forEach { row ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     row.forEach { key ->
-                        Box(
+                        val isDel = key == "del"
+                        Surface(
+                            shape = RoundedCornerShape(24.dp),
+                            color = if (isDel) numpadScheme.surfaceContainerHigh else numpadScheme.surfaceContainer,
                             modifier = Modifier
-                                .size(width = 80.dp, height = 56.dp)
-                                .clip(RoundedCornerShape(16.dp))
+                                .weight(1f)
+                                .height(62.dp)
+                                .clip(RoundedCornerShape(24.dp))
                                 .combinedClickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
                                     onClick = {
                                         when (key) {
                                             "del" -> {
@@ -394,25 +397,29 @@ fun GoogleClockKeypadInput(
                                             digits = ""
                                         }
                                     }
-                                ),
-                            contentAlignment = Alignment.Center
+                                )
                         ) {
-                            if (key == "del") {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.Backspace,
-                                    contentDescription = stringResource(R.string.delete),
-                                    tint = Color(0xFFE3E1E9),
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            } else {
-                                Text(
-                                    text = key,
-                                    style = MaterialTheme.typography.displaySmall.copy(
-                                        fontSize = 32.sp,
-                                        fontWeight = FontWeight.Normal
-                                    ),
-                                    color = Color(0xFFE3E1E9)
-                                )
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isDel) {
+                                    Icon(
+                                        imageVector = AppIcons.Backspace,
+                                        contentDescription = stringResource(R.string.delete),
+                                        tint = numpadScheme.onSurface,
+                                        modifier = Modifier.size(26.dp)
+                                    )
+                                } else {
+                                    Text(
+                                        text = key,
+                                        style = MaterialTheme.typography.displaySmall.copy(
+                                            fontSize = 30.sp,
+                                            fontWeight = FontWeight.Medium
+                                        ),
+                                        color = numpadScheme.onSurface
+                                    )
+                                }
                             }
                         }
                     }
@@ -428,7 +435,7 @@ fun GoogleClockKeypadInput(
                 Text(
                     text = stringResource(R.string.cancel),
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color(0xFF8E8D96)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         } else {
@@ -443,22 +450,23 @@ fun TimeSegmentColumn(
     label: String,
     hasInput: Boolean
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = value,
             style = MaterialTheme.typography.displayLarge.copy(
-                fontSize = 58.sp,
-                fontWeight = FontWeight.Normal
+                fontSize = 56.sp,
+                fontWeight = FontWeight.Bold
             ),
-            color = if (hasInput) Color(0xFFFFFFFF) else Color(0xFF52515A)
+            color = if (hasInput) colorScheme.onSurface else colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
         )
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = Color(0xFF8E8D96)
+            color = colorScheme.onSurfaceVariant
         )
     }
 }
@@ -506,38 +514,48 @@ fun RunningTimerCard(
     onAddFiveMin: () -> Unit,
     onEditLabel: () -> Unit
 ) {
-    var currentTimeMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var nowElapsed by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    var nowWall by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
-    // Butter-smooth 120 FPS continuous display frame synchronization
-    LaunchedEffect(timer.isRunning, timer.isPaused, timer.targetEndTimeMillis) {
-        if (timer.isRunning && !timer.isPaused && timer.targetEndTimeMillis > 0) {
+    // LTPO-friendly adaptive refresh: 1Hz on timers >2m (lets Pixel 7 Pro drop to 10Hz),
+    // 10Hz on medium timers, 30Hz in final 10s. Zero 120Hz busy-loop battery drain.
+    LaunchedEffect(timer.isRunning, timer.isPaused, timer.targetElapsedRealtimeMillis, timer.targetEndTimeMillis) {
+        if (timer.isRunning && !timer.isPaused) {
             while (isActive) {
-                withFrameMillis {
-                    currentTimeMillis = System.currentTimeMillis()
+                val e = SystemClock.elapsedRealtime()
+                val w = System.currentTimeMillis()
+                nowElapsed = e
+                nowWall = w
+                val rem = timer.calculateCurrentRemaining(w, e)
+                if (rem <= 0L) break
+                val stepMs = when {
+                    rem <= 10_000L -> 33L
+                    timer.initialDurationMillis <= 120_000L -> 100L
+                    else -> ((rem % 1000L).takeIf { it > 20L } ?: 1000L)
                 }
+                delay(stepMs)
             }
         }
     }
 
-    val currentRemaining = if (timer.isRunning && !timer.isPaused && timer.targetEndTimeMillis > 0) {
-        maxOf(0L, timer.targetEndTimeMillis - currentTimeMillis)
-    } else {
-        timer.remainingMillis
-    }
-
+    val currentRemaining = timer.calculateCurrentRemaining(nowWall, nowElapsed)
     val progress = if (timer.initialDurationMillis > 0) {
         (currentRemaining.toFloat() / timer.initialDurationMillis.toFloat()).coerceIn(0f, 1f)
     } else 0f
 
-    val formattedTime = timer.formattedTime(if (timer.isRunning && !timer.isPaused) currentTimeMillis else System.currentTimeMillis())
-    val timerTitle = if (timer.label.isNotBlank()) timer.label else stringResource(R.string.timer_for_five_min)
+    val isActiveRunning = timer.isRunning && !timer.isPaused
+    val colorScheme = MaterialTheme.colorScheme
+    val timerTitle = if (timer.label.isNotBlank()) timer.label else stringResource(R.string.tab_timer)
+
+    val cardBg = if (isActiveRunning) colorScheme.surfaceContainerHigh else colorScheme.surfaceContainerLow
+    val trackColor = colorScheme.surfaceContainerHighest
+    val arcColor = if (isActiveRunning) colorScheme.primary else colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+    val timeTextColor = if (isActiveRunning) colorScheme.onSurface else colorScheme.onSurfaceVariant
 
     Surface(
         shape = RoundedCornerShape(28.dp),
-        color = Color(0xFF1E1E24),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
+        color = cardBg,
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
@@ -554,22 +572,22 @@ fun RunningTimerCard(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(10.dp))
                         .clickable { onEditLabel() }
-                        .padding(4.dp)
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = timerTitle,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFE3E1E9)
+                        color = colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Icon(
-                        imageVector = Icons.Rounded.Edit,
+                        imageVector = AppIcons.Edit,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
-                        tint = Color(0xFF8E8D96)
+                        tint = colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -578,34 +596,32 @@ fun RunningTimerCard(
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Clear,
+                        imageVector = AppIcons.Close,
                         contentDescription = stringResource(R.string.cancel),
-                        tint = Color(0xFFC6C5D0),
-                        modifier = Modifier.size(24.dp)
+                        tint = colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Center: Circular Progress Ring (Screenshot 3)
+            // Center: Balanced Circular Progress Ring
             Box(
                 modifier = Modifier
-                    .size(290.dp)
-                    .padding(8.dp),
+                    .size(236.dp)
+                    .padding(6.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val strokeWidth = 12.dp.toPx()
-                    // Track
+                    val strokeWidth = 10.dp.toPx()
                     drawCircle(
-                        color = Color(0xFF383740),
+                        color = trackColor,
                         style = Stroke(width = strokeWidth)
                     )
-                    // Progress arc
                     val sweepAngle = 360f * progress
                     drawArc(
-                        color = Color(0xFFFFFFFF),
+                        color = arcColor,
                         startAngle = -90f,
                         sweepAngle = sweepAngle,
                         useCenter = false,
@@ -625,52 +641,71 @@ fun RunningTimerCard(
                     if (hours > 0) {
                         Text(
                             text = String.format(Locale.getDefault(), "%02d", hours),
-                            style = MaterialTheme.typography.displayLarge.copy(
-                                fontSize = 54.sp,
+                            style = MaterialTheme.typography.displayMedium.copy(
+                                fontSize = 42.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = (-1).sp
                             ),
-                            color = Color(0xFFFFFFFF)
+                            color = timeTextColor
                         )
                     }
                     Text(
                         text = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds),
                         style = MaterialTheme.typography.displayLarge.copy(
-                            fontSize = if (hours > 0) 64.sp else 86.sp,
+                            fontSize = if (hours > 0) 52.sp else 64.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = (-1).sp
                         ),
-                        color = Color(0xFFFFFFFF)
+                        color = timeTextColor
                     )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    IconButton(
-                        onClick = if (timer.isRunning && !timer.isPaused) onPause else onStart,
-                        modifier = Modifier.size(56.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (timer.isRunning && !timer.isPaused) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = if (timer.isRunning) stringResource(R.string.pause) else stringResource(R.string.resume),
-                            tint = Color(0xFFFFFFFF),
-                            modifier = Modifier.size(46.dp)
-                        )
-                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Bottom row inside card: +5:00 pill button on left, Reset circular button on right
+            // Unified Bottom Action Row: Play/Pause primary pill, +5:00 tonal pill, Reset circular button
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Wide pill button: +5:00 (Constraint satisfied)
                 Surface(
                     shape = RoundedCornerShape(24.dp),
-                    color = Color(0xFF2C2B33),
+                    color = colorScheme.primary,
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(1.2f)
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .clickable {
+                            if (isActiveRunning) onPause() else onStart()
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (isActiveRunning) AppIcons.Pause else AppIcons.PlayArrow,
+                            contentDescription = if (isActiveRunning) stringResource(R.string.pause) else stringResource(R.string.resume),
+                            tint = colorScheme.onPrimary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(if (isActiveRunning) R.string.pause else R.string.resume),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = colorScheme.onPrimary
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = colorScheme.surfaceContainerHighest,
+                    modifier = Modifier
+                        .weight(0.8f)
                         .height(52.dp)
                         .clip(RoundedCornerShape(24.dp))
                         .clickable { onAddFiveMin() }
@@ -683,25 +718,24 @@ fun RunningTimerCard(
                             text = "+5:00",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFE3E1E9)
+                            color = colorScheme.onSurface
                         )
                     }
                 }
 
-                // Reset button: Circular Refresh icon
                 Box(
                     modifier = Modifier
                         .size(52.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF2C2B33))
+                        .background(colorScheme.surfaceContainerHighest)
                         .clickable { onReset() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Refresh,
+                        imageVector = AppIcons.Refresh,
                         contentDescription = stringResource(R.string.reset),
-                        tint = Color(0xFFE3E1E9),
-                        modifier = Modifier.size(24.dp)
+                        tint = colorScheme.onSurface,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }

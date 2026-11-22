@@ -42,11 +42,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Alarm
-import androidx.compose.material.icons.rounded.HourglassBottom
-import androidx.compose.material.icons.rounded.Keyboard
-import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DateRangePicker
@@ -97,9 +93,11 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 
+private val BELL_ANGLES = floatArrayOf(-135f, -45f)
+
 enum class AppTab(@StringRes val titleRes: Int, val icon: ImageVector) {
-    ALARM(R.string.tab_alarm, Icons.Rounded.Alarm),
-    TIMER(R.string.tab_timer, Icons.Rounded.HourglassBottom)
+    ALARM(R.string.tab_alarm, AppIcons.Alarm),
+    TIMER(R.string.tab_timer, AppIcons.HourglassBottom)
 }
 
 class ModalGate {
@@ -150,7 +148,7 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
                 val radius = size.minDimension / 2f - 3.dp.toPx()
                 drawCircle(tint, radius = radius, center = c, style = Stroke(width = stroke))
                 // Little bells on top, like an alarm clock.
-                listOf(-135f, -45f).forEach { deg ->
+                BELL_ANGLES.forEach { deg ->
                     val rad = Math.toRadians(deg.toDouble())
                     val p = Offset(
                         c.x + ((radius + 1.5.dp.toPx()) * Math.cos(rad)).toFloat(),
@@ -172,6 +170,9 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
                 animationSpec = tween(durationMillis = 700, easing = LinearEasing),
                 label = "hourglassPos"
             )
+            val glassPath = remember { Path() }
+            val topSandPath = remember { Path() }
+            val bottomSandPath = remember { Path() }
             Canvas(
                 modifier = Modifier
                     .size(24.dp)
@@ -184,16 +185,15 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
 
                 // Glass outline: two caps and the two bulbs meeting at the neck.
                 fun drawGlass() {
-                    val body = Path().apply {
-                        moveTo(pt(6f, 4f).x, pt(6f, 4f).y)
-                        lineTo(pt(18f, 4f).x, pt(18f, 4f).y)
-                        lineTo(pt(12f, 12f).x, pt(12f, 12f).y)
-                        lineTo(pt(18f, 20f).x, pt(18f, 20f).y)
-                        lineTo(pt(6f, 20f).x, pt(6f, 20f).y)
-                        lineTo(pt(12f, 12f).x, pt(12f, 12f).y)
-                        close()
-                    }
-                    drawPath(body, tint, style = stroke)
+                    glassPath.reset()
+                    glassPath.moveTo(pt(6f, 4f).x, pt(6f, 4f).y)
+                    glassPath.lineTo(pt(18f, 4f).x, pt(18f, 4f).y)
+                    glassPath.lineTo(pt(12f, 12f).x, pt(12f, 12f).y)
+                    glassPath.lineTo(pt(18f, 20f).x, pt(18f, 20f).y)
+                    glassPath.lineTo(pt(6f, 20f).x, pt(6f, 20f).y)
+                    glassPath.lineTo(pt(12f, 12f).x, pt(12f, 12f).y)
+                    glassPath.close()
+                    drawPath(glassPath, tint, style = stroke)
                     drawLine(tint, pt(4f, 2.8f), pt(20f, 2.8f), strokeWidth = 2f * u, cap = StrokeCap.Round)
                     drawLine(tint, pt(4f, 21.2f), pt(20f, 21.2f), strokeWidth = 2f * u, cap = StrokeCap.Round)
                 }
@@ -203,13 +203,12 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
                     if (h <= 0.01f) return
                     val y = 12f - h
                     val hw = 6f * (12f - y) / 8f
-                    val sand = Path().apply {
-                        moveTo(pt(12f - hw, y).x, pt(12f - hw, y).y)
-                        lineTo(pt(12f + hw, y).x, pt(12f + hw, y).y)
-                        lineTo(pt(12f, 12f).x, pt(12f, 12f).y)
-                        close()
-                    }
-                    drawPath(sand, tint)
+                    topSandPath.reset()
+                    topSandPath.moveTo(pt(12f - hw, y).x, pt(12f - hw, y).y)
+                    topSandPath.lineTo(pt(12f + hw, y).x, pt(12f + hw, y).y)
+                    topSandPath.lineTo(pt(12f, 12f).x, pt(12f, 12f).y)
+                    topSandPath.close()
+                    drawPath(topSandPath, tint)
                 }
 
                 // Sand in the lower bulb: fills from the bottom up, height h in 0..8.
@@ -217,14 +216,13 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
                     if (h <= 0.01f) return
                     val y = 20f - h
                     val hw = 6f * (y - 12f) / 8f
-                    val sand = Path().apply {
-                        moveTo(pt(12f - hw, y).x, pt(12f - hw, y).y)
-                        lineTo(pt(12f + hw, y).x, pt(12f + hw, y).y)
-                        lineTo(pt(18f, 20f).x, pt(18f, 20f).y)
-                        lineTo(pt(6f, 20f).x, pt(6f, 20f).y)
-                        close()
-                    }
-                    drawPath(sand, tint)
+                    bottomSandPath.reset()
+                    bottomSandPath.moveTo(pt(12f - hw, y).x, pt(12f - hw, y).y)
+                    bottomSandPath.lineTo(pt(12f + hw, y).x, pt(12f + hw, y).y)
+                    bottomSandPath.lineTo(pt(18f, 20f).x, pt(18f, 20f).y)
+                    bottomSandPath.lineTo(pt(6f, 20f).x, pt(6f, 20f).y)
+                    bottomSandPath.close()
+                    drawPath(bottomSandPath, tint)
                 }
 
                 val frac = pos - floor(pos)
@@ -274,12 +272,12 @@ fun ExpressiveNavBar(
         AppTab.entries.forEach { tab ->
             val isSelected = selectedTab == tab
             val containerColor by animateColorAsState(
-                targetValue = if (isSelected) Color(0xFF35343C) else Color.Transparent,
+                targetValue = if (isSelected) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent,
                 animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
                 label = "tabColor"
             )
             val contentColor by animateColorAsState(
-                targetValue = if (isSelected) Color(0xFFE3E1E9) else Color(0xFF8E8D96),
+                targetValue = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
                 label = "tabTextColor"
             )
@@ -375,21 +373,19 @@ fun PredictiveBackLayer(
                 animationSpec = spring(dampingRatio = 0.68f, stiffness = Spring.StiffnessMediumLow)
             )
         }
-        val emphasized = run {
-            val raw = progress.value
-            1f - (1f - raw) * (1f - raw)
-        }
         val scrimClick = remember { MutableInteractionSource() }
         val cardClick = remember { MutableInteractionSource() }
+        val cardShape = remember { RoundedCornerShape(28.dp) }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Color.Black.copy(
-                        alpha = 0.62f * (1f - emphasized * 1.4f).coerceIn(0f, 1f) * entrance.value.coerceIn(0f, 1f)
-                    )
-                )
+                .drawBehind {
+                    val raw = progress.value
+                    val emphasized = 1f - (1f - raw) * (1f - raw)
+                    val scrimAlpha = 0.62f * (1f - emphasized * 1.4f).coerceIn(0f, 1f) * entrance.value.coerceIn(0f, 1f)
+                    drawRect(Color.Black.copy(alpha = scrimAlpha))
+                }
                 .clickable(interactionSource = scrimClick, indication = null, onClick = onDismiss),
             contentAlignment = Alignment.Center
         ) {
@@ -398,6 +394,8 @@ fun PredictiveBackLayer(
                     .statusBarsPadding()
                     .navigationBarsPadding()
                     .graphicsLayer {
+                        val raw = progress.value
+                        val emphasized = 1f - (1f - raw) * (1f - raw)
                         val pop = entrance.value
                         val scale = (0.86f + 0.14f * pop) - 0.38f * emphasized
                         scaleX = scale
@@ -405,7 +403,7 @@ fun PredictiveBackLayer(
                         translationX = (if (fromLeft) 120.dp else (-120).dp).toPx() * emphasized
                         translationY = 72.dp.toPx() * emphasized + 56.dp.toPx() * (1f - pop)
                         alpha = (pop.coerceIn(0f, 1f)) * (1f - 0.2f * emphasized)
-                        shape = RoundedCornerShape((28 + 28 * emphasized).dp)
+                        shape = cardShape
                         clip = true
                     }
                     .clickable(interactionSource = cardClick, indication = null, onClick = {})
@@ -525,9 +523,9 @@ fun ExpressiveTimePickerDialog(
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
-                            imageVector = if (isKeyboardMode) Icons.Rounded.Schedule else Icons.Rounded.Keyboard,
+                            imageVector = if (isKeyboardMode) AppIcons.Schedule else AppIcons.Keyboard,
                             contentDescription = stringResource(R.string.toggle_mode),
-                            tint = Color(0xFFE3E1E9)
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -536,25 +534,25 @@ fun ExpressiveTimePickerDialog(
                     TimeInput(
                         state = timePickerState,
                         colors = TimePickerDefaults.colors(
-                            timeSelectorSelectedContainerColor = Color(0xFF35343C),
-                            timeSelectorSelectedContentColor = Color(0xFFFFFFFF),
-                            timeSelectorUnselectedContainerColor = Color(0xFF25242C),
-                            timeSelectorUnselectedContentColor = Color(0xFF8E8D96)
+                            timeSelectorSelectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            timeSelectorSelectedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            timeSelectorUnselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            timeSelectorUnselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 } else {
                     TimePicker(
                         state = timePickerState,
                         colors = TimePickerDefaults.colors(
-                            clockDialColor = Color(0xFF28272F),
-                            selectorColor = Color(0xFFFFFFFF),
-                            containerColor = Color(0xFF1E1E24),
-                            clockDialSelectedContentColor = Color(0xFF191C20),
-                            clockDialUnselectedContentColor = Color(0xFFE3E1E9),
-                            timeSelectorSelectedContainerColor = Color(0xFF35343C),
-                            timeSelectorSelectedContentColor = Color(0xFFFFFFFF),
-                            timeSelectorUnselectedContainerColor = Color(0xFF25242C),
-                            timeSelectorUnselectedContentColor = Color(0xFF8E8D96)
+                            clockDialColor = MaterialTheme.colorScheme.surfaceContainer,
+                            selectorColor = MaterialTheme.colorScheme.primary,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            clockDialSelectedContentColor = MaterialTheme.colorScheme.onPrimary,
+                            clockDialUnselectedContentColor = MaterialTheme.colorScheme.onSurface,
+                            timeSelectorSelectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            timeSelectorSelectedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            timeSelectorUnselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            timeSelectorUnselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }
@@ -570,20 +568,18 @@ fun ExpressiveTimePickerDialog(
                         Text(
                             stringResource(R.string.cancel),
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFE3E1E9)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFFFFFFFF),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .clickable { onConfirm(timePickerState.hour, timePickerState.minute) }
+                        color = MaterialTheme.colorScheme.primary,
+                        onClick = { onConfirm(timePickerState.hour, timePickerState.minute) }
                     ) {
                         Text(
                             stringResource(R.string.save),
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF191C20),
+                            color = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp)
                         )
                     }

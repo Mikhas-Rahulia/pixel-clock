@@ -2,7 +2,7 @@ package io.github.mikhasrahulia.pixelclock.timer
 
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import io.github.mikhasrahulia.pixelclock.data.TimerHourStat
 import io.github.mikhasrahulia.pixelclock.data.TimerModel
@@ -12,16 +12,16 @@ import io.github.mikhasrahulia.pixelclock.data.summarizeTimerHour
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class TimerManager private constructor(private val context: Context) {
-    private val scope = CoroutineScope(Dispatchers.Main + Job())
-    private var tickerJob: Job? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var nextDueJob: Job? = null
     private val repository = TimerRepository.getInstance(context)
     private val scheduler = TimerScheduler.getInstance(context)
 
@@ -35,22 +35,34 @@ class TimerManager private constructor(private val context: Context) {
         return summarizeTimerHour(_runs.value, _timers.value, durationMillis, now)
     }
 
-    fun reconcile(acknowledgeStale: Boolean = false) {
+    fun reconcile(acknowledgeStale: Boolean = false, fromBoot: Boolean = false) {
         val now = System.currentTimeMillis()
+        val elapsed = SystemClock.elapsedRealtime()
         val fired = mutableListOf<TimerModel>()
         val next = _timers.value.map { timer ->
             if (timer.hasFired && acknowledgeStale) {
-                // Already rang in a previous run of the app: acknowledge it, never ring again.
                 scheduler.cancel(timer.id)
                 timer.reset()
-            } else if (timer.isRunning && !timer.isPaused && !timer.hasFired && timer.targetEndTimeMillis > 0L) {
-                if (timer.targetEndTimeMillis <= now) {
-                    val done = finishTimer(timer, now)
+            } else if (timer.isRunning && !timer.isPaused && !timer.hasFired) {
+                // On boot or legacy migration, elapsedRealtime resets to 0; reconstruct from wall-clock targetEndTimeMillis
+                val rem = if (fromBoot || timer.targetElapsedRealtimeMillis <= 0L) {
+                    (timer.targetEndTimeMillis - now).coerceAtLeast(0L)
+                } else {
+                    timer.calculateCurrentRemaining(now, elapsed)
+                }
+                if (rem <= 0L) {
+                    val done = finishTimer(timer, now, elapsed)
                     fired += done
                     done
                 } else {
-                    scheduler.schedule(timer)
-                    timer.copy(remainingMillis = timer.targetEndTimeMillis - now)
+                    val refreshed = timer.copy(
+                        remainingMillis = rem,
+                        targetEndTimeMillis = now + rem,
+                        targetElapsedRealtimeMillis = elapsed + rem,
+                        runAnchorElapsedMillis = if (fromBoot || timer.runAnchorElapsedMillis <= 0L) elapsed else timer.runAnchorElapsedMillis
+                    )
+                    scheduler.schedule(refreshed)
+                    refreshed
                 }
             } else {
                 if (!timer.isRunning) scheduler.cancel(timer.id)
@@ -58,13 +70,16 @@ class TimerManager private constructor(private val context: Context) {
             }
         }
         commit(next)
-        ensureTickerRunning()
-        syncWithService()
-        fired.forEach { deliverDue(it.id) }
+        scheduleNextLocalDue()
+        if (!fromBoot) {
+            syncWithService()
+            fired.forEach { deliverDue(it.id) }
+        }
     }
 
     fun createAndStartTimer(durationMillis: Long, label: String = ""): TimerModel {
         val now = System.currentTimeMillis()
+        val elapsed = SystemClock.elapsedRealtime()
         val timer = TimerModel(
             initialDurationMillis = durationMillis,
             originDurationMillis = durationMillis,
@@ -73,19 +88,22 @@ class TimerManager private constructor(private val context: Context) {
             isPaused = false,
             label = label,
             targetEndTimeMillis = now + durationMillis,
+            targetElapsedRealtimeMillis = elapsed + durationMillis,
             startedAtMillis = now,
-            runAnchorMillis = now
+            runAnchorMillis = now,
+            runAnchorElapsedMillis = elapsed
         )
         recordStart(timer)
         commit(_timers.value + timer)
         scheduler.schedule(timer)
-        ensureTickerRunning()
+        scheduleNextLocalDue()
         syncWithService()
         return timer
     }
 
     fun startTimer(timerId: String) {
         val now = System.currentTimeMillis()
+        val elapsed = SystemClock.elapsedRealtime()
         var started: TimerModel? = null
         val next = _timers.value.map { timer ->
             if (timer.id != timerId) timer
@@ -95,6 +113,7 @@ class TimerManager private constructor(private val context: Context) {
                     timer.copy(
                         bankedRunMillis = 0L,
                         runAnchorMillis = 0L,
+                        runAnchorElapsedMillis = 0L,
                         startedAtMillis = 0L,
                         hasFired = false,
                         isPaused = false,
@@ -103,7 +122,7 @@ class TimerManager private constructor(private val context: Context) {
                         initialDurationMillis = timer.originDurationMillis
                     )
                 } else timer
-                val running = base.start(now)
+                val running = base.start(now, elapsed)
                 if (fresh) recordStart(running)
                 started = running
                 running
@@ -111,65 +130,64 @@ class TimerManager private constructor(private val context: Context) {
         }
         commit(next)
         started?.let { scheduler.schedule(it) }
-        ensureTickerRunning()
+        scheduleNextLocalDue()
         syncWithService()
     }
 
     fun pauseTimer(timerId: String) {
         val now = System.currentTimeMillis()
+        val elapsed = SystemClock.elapsedRealtime()
         var paused: TimerModel? = null
         val next = _timers.value.map { timer ->
             if (timer.id != timerId) timer
-            else timer.pause(now).also { paused = it }
+            else timer.pause(now, elapsed).also { paused = it }
         }
-        paused?.let { updateRun(it.id, it.startedAtMillis, it.completedFullMinutes(now)) }
+        paused?.let { updateRun(it.id, it.startedAtMillis, it.completedFullMinutes(now, elapsed)) }
         commit(next)
         scheduler.cancel(timerId)
-        checkStopTicker()
+        scheduleNextLocalDue()
         syncWithService()
     }
 
     fun resetTimer(timerId: String) {
         val now = System.currentTimeMillis()
+        val elapsed = SystemClock.elapsedRealtime()
         val current = _timers.value.find { it.id == timerId }
         if (current != null && current.startedAtMillis > 0L) {
-            updateRun(current.id, current.startedAtMillis, current.completedFullMinutes(now))
+            updateRun(current.id, current.startedAtMillis, current.completedFullMinutes(now, elapsed))
         }
         commit(_timers.value.map { if (it.id == timerId) it.reset() else it })
         scheduler.cancel(timerId)
-        checkStopTicker()
+        scheduleNextLocalDue()
         syncWithService()
     }
 
     fun deleteTimer(timerId: String) {
         val now = System.currentTimeMillis()
+        val elapsed = SystemClock.elapsedRealtime()
         val current = _timers.value.find { it.id == timerId }
         if (current != null && current.startedAtMillis > 0L && !current.hasFired) {
-            updateRun(current.id, current.startedAtMillis, current.completedFullMinutes(now))
+            updateRun(current.id, current.startedAtMillis, current.completedFullMinutes(now, elapsed))
         }
         commit(_timers.value.filterNot { it.id == timerId })
         scheduler.cancel(timerId)
-        checkStopTicker()
+        scheduleNextLocalDue()
         syncWithService()
     }
 
     fun addFiveMinutes(timerId: String) {
         val now = System.currentTimeMillis()
+        val elapsed = SystemClock.elapsedRealtime()
         var updated: TimerModel? = null
         val next = _timers.value.map { timer ->
             if (timer.id != timerId) timer
             else {
                 val changed = if (timer.hasFired || (!timer.isRunning && timer.remainingMillis <= 0L)) {
-                    timer.snoozeFive(now)
+                    timer.snoozeFive(now, elapsed)
                 } else {
-                    timer.addMinutes(5, now).let { added ->
-                        if (!added.isRunning) added else added
-                    }
+                    timer.addMinutes(5, now, elapsed)
                 }
-                updated = if (changed.isRunning) changed else {
-                    // Adding time to a paused or idle timer should keep it countable.
-                    if (timer.hasFired) changed else changed
-                }
+                updated = changed
                 changed
             }
         }
@@ -177,20 +195,21 @@ class TimerManager private constructor(private val context: Context) {
         updated?.let { timer ->
             if (timer.isRunning && !timer.isPaused) scheduler.schedule(timer) else scheduler.cancel(timer.id)
         }
-        ensureTickerRunning()
+        scheduleNextLocalDue()
         syncWithService()
     }
 
     fun addOneMinute(timerId: String) {
         val now = System.currentTimeMillis()
+        val elapsed = SystemClock.elapsedRealtime()
         var updated: TimerModel? = null
         val next = _timers.value.map { timer ->
             if (timer.id != timerId) timer
-            else timer.addMinutes(1, now).also { updated = it }
+            else timer.addMinutes(1, now, elapsed).also { updated = it }
         }
         commit(next)
         updated?.let { if (it.isRunning && !it.isPaused) scheduler.schedule(it) }
-        ensureTickerRunning()
+        scheduleNextLocalDue()
         syncWithService()
     }
 
@@ -200,22 +219,23 @@ class TimerManager private constructor(private val context: Context) {
     }
 
     /**
-     * Called when AlarmManager fires, including after the process was killed.
+     * Called when AlarmManager fires, including after the process was killed or Dozing.
      */
     fun onSystemAlarm(timerId: String) {
         val now = System.currentTimeMillis()
+        val elapsed = SystemClock.elapsedRealtime()
         val current = _timers.value.find { it.id == timerId } ?: return
         if (current.hasFired || !current.isRunning || current.isPaused) return
-        if (current.targetEndTimeMillis > now + 1500L) return
-        val done = finishTimer(current, now.coerceAtLeast(current.targetEndTimeMillis))
+        if (current.calculateCurrentRemaining(now, elapsed) > 1500L) return
+        val done = finishTimer(current, now, elapsed)
         commit(_timers.value.map { if (it.id == timerId) done else it })
         scheduler.cancel(timerId)
-        checkStopTicker()
+        scheduleNextLocalDue()
         deliverDue(timerId)
     }
 
-    private fun finishTimer(timer: TimerModel, now: Long): TimerModel {
-        val minutes = timer.completedFullMinutes(now).coerceAtLeast(timer.originFullMinutes())
+    private fun finishTimer(timer: TimerModel, now: Long, elapsed: Long): TimerModel {
+        val minutes = timer.completedFullMinutes(now, elapsed).coerceAtLeast(timer.originFullMinutes())
         updateRun(timer.id, timer.startedAtMillis, minutes)
         return timer.copy(
             isRunning = false,
@@ -223,29 +243,23 @@ class TimerManager private constructor(private val context: Context) {
             hasFired = true,
             remainingMillis = 0L,
             targetEndTimeMillis = 0L,
+            targetElapsedRealtimeMillis = 0L,
             bankedRunMillis = minutes * 60_000L,
-            runAnchorMillis = 0L
+            runAnchorMillis = 0L,
+            runAnchorElapsedMillis = 0L
         )
     }
 
-    private fun TimerModel.originFullMinutes(): Int {
-        return (originDurationMillis / 60_000L).toInt()
-    }
+    private fun TimerModel.originFullMinutes(): Int = (originDurationMillis / 60_000L).toInt()
 
     private fun deliverDue(timerId: String) {
         val intent = Intent(context, TimerService::class.java).apply {
             action = TimerService.ACTION_TIMER_DUE
             putExtra(TimerService.EXTRA_TIMER_ID, timerId)
         }
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Unable to start timer alert", e)
-        }
+        runCatching {
+            context.startForegroundService(intent)
+        }.onFailure { Log.e(TAG, "Unable to start timer alert", it) }
     }
 
     private fun recordStart(timer: TimerModel) {
@@ -286,56 +300,37 @@ class TimerManager private constructor(private val context: Context) {
         repository.saveTimers(list)
     }
 
-    private fun ensureTickerRunning() {
-        if (tickerJob?.isActive == true) return
-        if (_timers.value.none { it.isRunning && !it.isPaused && !it.hasFired }) return
-        tickerJob = scope.launch {
-            while (isActive) {
-                delay(500)
-                val now = System.currentTimeMillis()
-                val due = _timers.value.filter {
-                    it.isRunning && !it.isPaused && !it.hasFired &&
-                        it.targetEndTimeMillis > 0L && it.targetEndTimeMillis <= now
-                }
-                if (due.isEmpty()) {
-                    if (_timers.value.none { it.isRunning && !it.isPaused && !it.hasFired }) break
-                    continue
-                }
-                var list = _timers.value
-                due.forEach { timer ->
-                    val done = finishTimer(timer, now)
-                    list = list.map { if (it.id == timer.id) done else it }
-                    scheduler.cancel(timer.id)
-                }
-                commit(list)
-                due.forEach { deliverDue(it.id) }
-                if (list.none { it.isRunning && !it.isPaused && !it.hasFired }) break
-            }
-            tickerJob = null
-        }
-    }
+    /**
+     * Zero-polling local wakeup: suspends for the exact remaining duration of the soonest timer
+     * (no 500ms CPU wake loop). AlarmManager guarantees wakeup if the process is frozen/Dozing.
+     */
+    private fun scheduleNextLocalDue() {
+        nextDueJob?.cancel()
+        val now = System.currentTimeMillis()
+        val elapsed = SystemClock.elapsedRealtime()
+        val soonest = _timers.value
+            .filter { it.isRunning && !it.isPaused && !it.hasFired }
+            .minByOrNull { it.calculateCurrentRemaining(now, elapsed) }
+            ?: return
 
-    private fun checkStopTicker() {
-        if (_timers.value.none { it.isRunning && !it.isPaused && !it.hasFired }) {
-            tickerJob?.cancel()
-            tickerJob = null
+        val waitMs = soonest.calculateCurrentRemaining(now, elapsed)
+        nextDueJob = scope.launch {
+            if (waitMs > 0L) delay(waitMs + 50L)
+            onSystemAlarm(soonest.id)
         }
     }
 
     private fun syncWithService() {
-        val active = _timers.value.any { (it.isRunning || it.isPaused) && !it.hasFired }
+        // Only run FGS while at least one timer is actively counting down (or ringing).
+        // Paused timers do not hold a foreground service.
+        val hasRunning = _timers.value.any { it.isRunning && !it.isPaused && !it.hasFired }
+        val hasRinging = _timers.value.any { it.hasFired }
         val intent = Intent(context, TimerService::class.java)
-        if (active) {
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(intent)
-                } else {
-                    context.startService(intent)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Foreground service start blocked", e)
-            }
-        } else if (_timers.value.none { it.hasFired }) {
+        if (hasRunning) {
+            runCatching {
+                context.startForegroundService(intent)
+            }.onFailure { Log.e(TAG, "Foreground service start blocked", it) }
+        } else if (!hasRinging) {
             context.stopService(intent)
         }
     }
@@ -350,7 +345,7 @@ class TimerManager private constructor(private val context: Context) {
             return instance ?: synchronized(this) {
                 instance ?: TimerManager(context.applicationContext).also {
                     instance = it
-                    it.reconcile(acknowledgeStale = true)
+                    it.reconcile(acknowledgeStale = true, fromBoot = true)
                 }
             }
         }

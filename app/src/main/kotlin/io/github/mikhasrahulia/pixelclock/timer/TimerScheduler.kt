@@ -4,22 +4,34 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import android.os.SystemClock
 import android.util.Log
-import io.github.mikhasrahulia.pixelclock.MainActivity
 import io.github.mikhasrahulia.pixelclock.data.TimerModel
 
 /**
- * Real AlarmManager timers. They survive process death, Doze and reboot.
+ * Monotonic AlarmManager wakeups for timers (ELAPSED_REALTIME_WAKEUP).
+ * Immune to NTP/timezone adjustments and does not hijack the Pixel AOD "Next Alarm" slot.
  */
 class TimerScheduler(private val context: Context) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
     fun schedule(timer: TimerModel) {
-        if (!timer.isRunning || timer.isPaused || timer.hasFired || timer.targetEndTimeMillis <= 0L) {
+        if (!timer.isRunning || timer.isPaused || timer.hasFired) {
             cancel(timer.id)
             return
         }
+        val triggerElapsed = when {
+            timer.targetElapsedRealtimeMillis > 0L -> timer.targetElapsedRealtimeMillis
+            timer.targetEndTimeMillis > 0L -> {
+                val rem = (timer.targetEndTimeMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+                SystemClock.elapsedRealtime() + rem
+            }
+            else -> {
+                cancel(timer.id)
+                return
+            }
+        }
+
         val fireIntent = Intent(context, TimerReceiver::class.java).apply {
             action = ACTION_TIMER_FIRE
             putExtra(EXTRA_TIMER_ID, timer.id)
@@ -30,28 +42,22 @@ class TimerScheduler(private val context: Context) {
             fireIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val showIntent = PendingIntent.getActivity(
-            context,
-            requestCode(timer.id) + 1,
-            Intent(context, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                alarmManager.setAlarmClock(
-                    AlarmManager.AlarmClockInfo(timer.targetEndTimeMillis, showIntent),
-                    pending
-                )
-            } else {
-                alarmManager.setExact(AlarmManager.RTC_WAKEUP, timer.targetEndTimeMillis, pending)
-            }
-            Log.d(TAG, "Scheduled timer ${timer.id} at ${timer.targetEndTimeMillis}")
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                triggerElapsed,
+                pending
+            )
+            Log.d(TAG, "Scheduled timer ${timer.id} at elapsed=$triggerElapsed")
         } catch (e: SecurityException) {
             Log.e(TAG, "Exact alarm not allowed", e)
-            try {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timer.targetEndTimeMillis, pending)
-            } catch (ex: Exception) {
-                ex.printStackTrace()
+            runCatching {
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    triggerElapsed,
+                    pending
+                )
             }
         }
     }

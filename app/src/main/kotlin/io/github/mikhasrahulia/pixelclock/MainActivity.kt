@@ -2,7 +2,6 @@ package io.github.mikhasrahulia.pixelclock
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,28 +16,31 @@ import io.github.mikhasrahulia.pixelclock.alarm.AlarmScheduler
 import io.github.mikhasrahulia.pixelclock.timer.TimerManager
 import io.github.mikhasrahulia.pixelclock.ui.main.MainScreen
 import io.github.mikhasrahulia.pixelclock.ui.theme.PixelClockTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private val requestNotificationPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-            // Notification permission result handled
-        }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            splashScreen.setOnExitAnimationListener { it.remove() }
-        }
-
+        splashScreen.setOnExitAnimationListener { it.remove() }
         enableEdgeToEdge()
 
-        // Check & request notification permission for Android 13+ (Pixel 7 Pro)
         checkPermissions()
 
-        // Ensure active alarms are scheduled
-        AlarmScheduler.getInstance(this).rescheduleAllAlarms()
-        TimerManager.getInstance(this).reconcile()
+        // Offload cold-start alarm/timer reconciliation off the main thread for instant TTID
+        val appContext = applicationContext
+        backgroundScope.launch {
+            AlarmScheduler.getInstance(appContext).rescheduleAllAlarms()
+            TimerManager.getInstance(appContext).reconcile()
+        }
 
         setContent {
             PixelClockTheme {
@@ -53,14 +55,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 }

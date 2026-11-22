@@ -2,6 +2,9 @@ package io.github.mikhasrahulia.pixelclock.data
 
 import android.content.Context
 import io.github.mikhasrahulia.pixelclock.R
+import androidx.compose.runtime.Immutable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -12,6 +15,8 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
 
+@OptIn(ExperimentalSerializationApi::class)
+@Immutable
 @Serializable
 data class AlarmModel(
     val id: String = UUID.randomUUID().toString(),
@@ -26,6 +31,7 @@ data class AlarmModel(
     // Bi-weekly recurrence
     val isBiWeekly: Boolean = false,
     // Week parity: 0 or 1 based on (epochDay + 3) / 7 % 2
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val weekParity: Int = currentWeekParity(),
     val vibrate: Boolean = true,
     val soundTitle: String = "",

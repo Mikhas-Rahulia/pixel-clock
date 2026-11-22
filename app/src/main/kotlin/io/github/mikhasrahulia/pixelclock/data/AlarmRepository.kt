@@ -2,40 +2,63 @@ package io.github.mikhasrahulia.pixelclock.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 class AlarmRepository(private val context: Context) {
     private val prefs: SharedPreferences =
         context.clockPrefs(AlarmBackup.PREFS_NAME, KEY_ALARMS)
+
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val writeQueue = Channel<List<AlarmModel>>(Channel.CONFLATED)
 
     private val _alarms = MutableStateFlow<List<AlarmModel>>(emptyList())
     val alarms: StateFlow<List<AlarmModel>> = _alarms.asStateFlow()
 
     init {
         loadAlarms()
+        ioScope.launch {
+            for (snapshot in writeQueue) {
+                persistSync(snapshot)
+            }
+        }
     }
 
     private fun loadAlarms() {
-        val fromPrefs = prefs.getString(KEY_ALARMS, null)?.let { AlarmBackup.decode(it) }
-        val fromImport = AlarmBackup.consumeImportFile(context)
-        val fromLegacy = AlarmBackup.readLegacyPackage(context)
-        val fromBackup = AlarmBackup.readBackup(context)
+        var needsPersist = false
+        var list: List<AlarmModel>? = AlarmBackup.readStore(context)
 
-        var list = fromPrefs ?: emptyList()
-        // A JSON file dropped next to the app (or adb-pushed) wins as a one-shot import.
-        if (fromImport != null) {
-            list = AlarmBackup.merge(list, fromImport)
-        } else if (fromLegacy != null && (list.isEmpty() || AlarmBackup.isDemoSeed(list))) {
-            list = AlarmBackup.merge(list, fromLegacy)
-        } else if (list.isEmpty() && fromBackup != null) {
-            list = fromBackup
+        // Seamless one-time migration from SharedPreferences (preserves all existing user alarms)
+        if (list == null) {
+            val rawPrefs = prefs.getString(KEY_ALARMS, null)
+            if (rawPrefs != null) {
+                list = AlarmBackup.decode(rawPrefs)
+                if (list != null) needsPersist = true
+            }
         }
 
-        val cleaned = deduplicateAlarms(list)
+        val resolved = list ?: emptyList()
+        val imported = AlarmBackup.consumeImportFile(context)
+        val merged = if (imported != null) {
+            needsPersist = true
+            AlarmBackup.merge(resolved, imported)
+        } else {
+            resolved
+        }
+
+        val cleaned = deduplicateAlarms(merged)
+        if (cleaned.size != merged.size) needsPersist = true
+
         _alarms.value = cleaned
-        saveAlarms(cleaned)
+        if (needsPersist) {
+            scheduleSave(cleaned)
+        }
         if (prefs.getInt(AlarmBackup.KEY_SCHEMA, 0) < AlarmBackup.SCHEMA_VERSION) {
             prefs.edit().putInt(AlarmBackup.KEY_SCHEMA, AlarmBackup.SCHEMA_VERSION).apply()
         }
@@ -57,38 +80,41 @@ class AlarmRepository(private val context: Context) {
         return result
     }
 
-    private fun saveAlarms(list: List<AlarmModel>) {
-        try {
-            val jsonStr = AlarmBackup.encode(list)
-            prefs.edit().putString(KEY_ALARMS, jsonStr).apply()
-            AlarmBackup.writeBackup(context, list)
-        } catch (e: Exception) {
-            e.printStackTrace()
+    private fun scheduleSave(list: List<AlarmModel>) {
+        writeQueue.trySend(list)
+    }
+
+    private fun persistSync(list: List<AlarmModel>) {
+        runCatching {
+            val encoded = AlarmBackup.encode(list)
+            AlarmBackup.writeStore(context, encoded)
+            // Keep DE SharedPreferences mirrored for backwards compatibility across updates
+            prefs.edit().putString(KEY_ALARMS, encoded).apply()
         }
     }
 
     fun replaceAll(list: List<AlarmModel>) {
         val cleaned = deduplicateAlarms(list)
         _alarms.value = cleaned
-        saveAlarms(cleaned)
+        scheduleSave(cleaned)
     }
 
     fun addAlarm(alarm: AlarmModel) {
         val updated = _alarms.value + alarm
         _alarms.value = updated
-        saveAlarms(updated)
+        scheduleSave(updated)
     }
 
     fun updateAlarm(alarm: AlarmModel) {
         val updated = _alarms.value.map { if (it.id == alarm.id) alarm else it }
         _alarms.value = updated
-        saveAlarms(updated)
+        scheduleSave(updated)
     }
 
     fun deleteAlarm(alarmId: String) {
         val updated = _alarms.value.filterNot { it.id == alarmId }
         _alarms.value = updated
-        saveAlarms(updated)
+        scheduleSave(updated)
     }
 
     fun toggleAlarm(alarmId: String, enabled: Boolean): AlarmModel? {
@@ -101,7 +127,7 @@ class AlarmRepository(private val context: Context) {
             } else it
         }
         _alarms.value = updated
-        saveAlarms(updated)
+        scheduleSave(updated)
         return updatedAlarm
     }
 
@@ -115,7 +141,7 @@ class AlarmRepository(private val context: Context) {
             } else it
         }
         _alarms.value = updated
-        saveAlarms(updated)
+        scheduleSave(updated)
         return updatedAlarm
     }
 

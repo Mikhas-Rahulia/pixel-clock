@@ -2,36 +2,33 @@ package io.github.mikhasrahulia.pixelclock.data
 
 import android.content.Context
 import android.util.Log
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 
 /**
- * Survives app updates (same applicationId). Also used to copy alarms from a
- * previous package, or from a JSON file pushed next to the app.
- *
- * Search order on load:
- *  1. Shared preferences (normal store)
- *  2. `alarms-import.json` in the app's external files dir (then deleted)
- *  3. The previous package [LEGACY_PACKAGE], if it is still installed
- *  4. Local [BACKUP_NAME] written on every save
- *
- * Demo 07:00 / 08:30 seeds are dropped when a real import is found.
+ * Atomic JSON persistence for alarms inside Device-Encrypted (DE) internal storage.
+ * Survives app updates and Pixel overnight OTA reboots without exposing plaintext data
+ * to external storage or cloud backup.
  */
 internal object AlarmBackup {
     const val LEGACY_PACKAGE = "com.example.pixelclock"
     const val PREFS_NAME = "pixel_clock_alarms"
     const val KEY_ALARMS = "key_alarms_list"
     const val KEY_SCHEMA = "key_alarms_schema"
-    const val SCHEMA_VERSION = 2
+    const val SCHEMA_VERSION = 3
+    const val STORAGE_NAME = "alarms-store.json"
     const val BACKUP_NAME = "alarms-backup.json"
     const val IMPORT_NAME = "alarms-import.json"
 
     private const val TAG = "AlarmBackup"
 
+    @OptIn(ExperimentalSerializationApi::class)
     val json = Json {
         ignoreUnknownKeys = true
-        encodeDefaults = true
+        encodeDefaults = false
+        explicitNulls = false
     }
 
     fun decode(raw: String): List<AlarmModel>? = runCatching {
@@ -40,58 +37,59 @@ internal object AlarmBackup {
 
     fun encode(list: List<AlarmModel>): String = json.encodeToString(list)
 
-    fun backupFile(context: Context): File = File(context.filesDir, BACKUP_NAME)
+    fun storeFile(context: Context): File = File(context.deviceProtectedContext().filesDir, STORAGE_NAME)
 
-    fun importFile(context: Context): File {
-        val dir = context.getExternalFilesDir(null) ?: context.filesDir
-        return File(dir, IMPORT_NAME)
+    fun backupFile(context: Context): File = File(context.deviceProtectedContext().filesDir, BACKUP_NAME)
+
+    fun writeStore(context: Context, encodedJson: String) {
+        runCatching { writeAtomicText(storeFile(context), encodedJson) }
+            .onFailure { Log.e(TAG, "Failed writing atomic alarm store", it) }
+        runCatching { writeAtomicText(backupFile(context), encodedJson) }
+            .onFailure { Log.w(TAG, "Failed writing atomic alarm backup", it) }
     }
 
-    fun writeBackup(context: Context, list: List<AlarmModel>) {
-        val text = encode(list)
-        runCatching { backupFile(context).writeText(text) }
-        runCatching {
-            val external = context.getExternalFilesDir(null) ?: return@runCatching
-            File(external, BACKUP_NAME).writeText(text)
+    fun readStore(context: Context): List<AlarmModel>? {
+        val primary = storeFile(context)
+        readAtomicText(primary)?.let { raw ->
+            decode(raw)?.let { return it }
+            quarantineCorruptFile(primary)
         }
+        return readBackup(context)
     }
 
     fun readBackup(context: Context): List<AlarmModel>? {
-        val files = listOf(
-            backupFile(context),
-            File(context.getExternalFilesDir(null) ?: return null, BACKUP_NAME)
-        )
-        for (file in files) {
-            if (!file.isFile) continue
-            decode(file.readText())?.let { return it }
+        val candidates = mutableListOf(backupFile(context))
+        if (context.isUserUnlockedSafe()) {
+            runCatching { File(context.applicationContext.filesDir, BACKUP_NAME) }
+                .getOrNull()?.let { candidates += it }
+        }
+        for (file in candidates) {
+            val raw = readAtomicText(file) ?: continue
+            decode(raw)?.let { return it }
+            quarantineCorruptFile(file)
         }
         return null
     }
 
-    /** One-shot file the user (or an installer) can drop in. Consumed after a successful read. */
+    /** Optional one-shot import when unlocked. Never touches CE/external storage during Direct Boot. */
     fun consumeImportFile(context: Context): List<AlarmModel>? {
-        val file = importFile(context)
-        if (!file.isFile) return null
-        val list = decode(file.readText())
-        runCatching { file.delete() }
-        return list
+        if (!context.isUserUnlockedSafe()) return null
+        return runCatching {
+            val dir = context.applicationContext.getExternalFilesDir(null) ?: return null
+            val file = File(dir, IMPORT_NAME)
+            if (!file.isFile) return null
+            val list = decode(file.readText())
+            file.delete()
+            list
+        }.getOrNull()
     }
 
-    /**
-     * Read SharedPreferences of [LEGACY_PACKAGE]. This only works if both apps share a UID
-     * (they do not, after a package rename). Failures are ignored.
-     */
-    fun readLegacyPackage(context: Context): List<AlarmModel>? {
-        val other = runCatching {
-            context.createPackageContext(LEGACY_PACKAGE, 0)
-        }.getOrNull() ?: return null
-        val protected = runCatching { other.createDeviceProtectedStorageContext() }.getOrNull() ?: other
-        val raw = protected.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_ALARMS, null)
-            ?: other.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .getString(KEY_ALARMS, null)
-            ?: return null
-        return decode(raw)
+    private fun quarantineCorruptFile(file: File) {
+        runCatching {
+            if (file.isFile) {
+                file.renameTo(File(file.parentFile, "${file.name}.corrupt"))
+            }
+        }
     }
 
     fun isDemoAlarm(alarm: AlarmModel): Boolean {

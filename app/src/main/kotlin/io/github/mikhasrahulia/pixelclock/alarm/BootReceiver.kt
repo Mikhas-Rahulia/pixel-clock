@@ -8,16 +8,18 @@ import io.github.mikhasrahulia.pixelclock.timer.TimerManager
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val action = intent.action
+        val action = intent.action ?: return
         Log.d("BootReceiver", "Received broadcast: $action")
-        if (action == Intent.ACTION_BOOT_COMPLETED ||
-            action == Intent.ACTION_LOCKED_BOOT_COMPLETED ||
+        val isBoot = action == Intent.ACTION_BOOT_COMPLETED ||
+            action == Intent.ACTION_LOCKED_BOOT_COMPLETED
+        if (isBoot ||
             action == Intent.ACTION_TIME_CHANGED ||
             action == Intent.ACTION_TIMEZONE_CHANGED ||
             action == Intent.ACTION_MY_PACKAGE_REPLACED
         ) {
             AlarmScheduler.getInstance(context).rescheduleAllAlarms()
-            TimerManager.getInstance(context).reconcile()
+            // Never start a specialUse FGS from BOOT_COMPLETED on Android 15/16
+            TimerManager.getInstance(context).reconcile(fromBoot = isBoot)
         }
     }
 }

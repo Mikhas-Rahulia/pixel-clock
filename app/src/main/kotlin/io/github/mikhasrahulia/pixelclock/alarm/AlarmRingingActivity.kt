@@ -1,12 +1,13 @@
 package io.github.mikhasrahulia.pixelclock.alarm
 
-import android.app.KeyguardManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import android.content.IntentFilter
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -24,14 +25,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Alarm
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Snooze
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -48,12 +47,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.res.stringResource
+import androidx.core.content.ContextCompat
 import io.github.mikhasrahulia.pixelclock.R
+import io.github.mikhasrahulia.pixelclock.ui.components.AppIcons
 import io.github.mikhasrahulia.pixelclock.ui.theme.PixelClockTheme
 import kotlinx.coroutines.delay
 import java.time.LocalTime
@@ -61,27 +62,46 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 class AlarmRingingActivity : ComponentActivity() {
+    private var alarmIdState by mutableStateOf("")
+    private var alarmLabelState by mutableStateOf("")
+
+    private val dismissReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == AlarmScheduler.ACTION_ALARM_DISMISSED) {
+                finish()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        turnScreenOnAndKeyguard()
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enableEdgeToEdge()
 
-        val alarmId = intent.getStringExtra(AlarmScheduler.EXTRA_ALARM_ID) ?: ""
-        val alarmLabel = intent.getStringExtra(AlarmScheduler.EXTRA_ALARM_LABEL) ?: ""
+        updateFromIntent(intent)
+
+        ContextCompat.registerReceiver(
+            this,
+            dismissReceiver,
+            IntentFilter(AlarmScheduler.ACTION_ALARM_DISMISSED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
 
         setContent {
             PixelClockTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.surface
+                    color = MaterialTheme.colorScheme.background
                 ) {
                     AlarmRingingScreen(
-                        label = alarmLabel,
+                        label = alarmLabelState,
                         onDismiss = {
                             val dismissIntent = Intent(this, AlarmReceiver::class.java).apply {
                                 action = AlarmScheduler.ACTION_ALARM_DISMISS
-                                putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
+                                putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmIdState)
                             }
                             sendBroadcast(dismissIntent)
                             finish()
@@ -89,7 +109,8 @@ class AlarmRingingActivity : ComponentActivity() {
                         onSnooze = {
                             val snoozeIntent = Intent(this, AlarmReceiver::class.java).apply {
                                 action = AlarmScheduler.ACTION_ALARM_SNOOZE
-                                putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
+                                putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmIdState)
+                                putExtra(AlarmScheduler.EXTRA_ALARM_LABEL, alarmLabelState)
                             }
                             sendBroadcast(snoozeIntent)
                             finish()
@@ -100,47 +121,46 @@ class AlarmRingingActivity : ComponentActivity() {
         }
     }
 
-    private fun turnScreenOnAndKeyguard() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            keyguardManager.requestDismissKeyguard(this, null)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                        WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            )
-        }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        updateFromIntent(intent)
+    }
+
+    private fun updateFromIntent(intent: Intent?) {
+        alarmIdState = intent?.getStringExtra(AlarmScheduler.EXTRA_ALARM_ID).orEmpty()
+        alarmLabelState = intent?.getStringExtra(AlarmScheduler.EXTRA_ALARM_LABEL).orEmpty()
+    }
+
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(dismissReceiver) }
+        super.onDestroy()
     }
 }
 
 @Composable
-fun AlarmRingingScreen(
+private fun AlarmRingingScreen(
     label: String,
     onDismiss: () -> Unit,
     onSnooze: () -> Unit
 ) {
-    var currentTime by remember { mutableStateOf(LocalTime.now()) }
+    BackHandler { /* Prevent back gesture from hiding UI while alarm keeps ringing */ }
 
+    var currentTime by remember { mutableStateOf(LocalTime.now()) }
     LaunchedEffect(Unit) {
         while (true) {
             currentTime = LocalTime.now()
-            delay(1000)
+            delay(1000L)
         }
     }
 
-    val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
-    val secondsFormatter = DateTimeFormatter.ofPattern(":ss", Locale.getDefault())
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()) }
+    val secondsFormatter = remember { DateTimeFormatter.ofPattern(":ss", Locale.getDefault()) }
 
-    // Pulsing animation for alarm icon
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.92f,
-        targetValue = 1.08f,
+        initialValue = 0.94f,
+        targetValue = 1.06f,
         animationSpec = infiniteRepeatable(
             animation = tween(900, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -151,34 +171,35 @@ fun AlarmRingingScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 48.dp),
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Top section: Alarm label and icon
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(top = 40.dp)
+            modifier = Modifier.padding(top = 36.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(96.dp)
+                    .size(92.dp)
                     .scale(pulseScale)
                     .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Alarm,
+                    imageVector = AppIcons.Alarm,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(44.dp)
                 )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = if (label.isNotBlank()) label else stringResource(R.string.tab_alarm),
+                text = label.ifBlank { stringResource(R.string.tab_alarm) },
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -186,7 +207,6 @@ fun AlarmRingingScreen(
             )
         }
 
-        // Center section: Big clock
         Row(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.Center
@@ -194,20 +214,20 @@ fun AlarmRingingScreen(
             Text(
                 text = currentTime.format(timeFormatter),
                 style = MaterialTheme.typography.displayLarge.copy(
-                    fontSize = 80.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 84.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-2).sp
                 ),
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
                 text = currentTime.format(secondsFormatter),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 14.dp)
             )
         }
 
-        // Bottom section: Expressive Action Buttons
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -216,44 +236,44 @@ fun AlarmRingingScreen(
                 onClick = onDismiss,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp),
-                shape = RoundedCornerShape(32.dp),
+                    .height(68.dp),
+                shape = RoundedCornerShape(34.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Close,
+                    imageVector = AppIcons.Close,
                     contentDescription = null,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(26.dp)
                 )
-                Spacer(modifier = Modifier.size(12.dp))
+                Spacer(modifier = Modifier.size(10.dp))
                 Text(
                     text = stringResource(R.string.dismiss),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             FilledTonalButton(
                 onClick = onSnooze,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp)
+                    .height(58.dp),
+                shape = RoundedCornerShape(29.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Snooze,
+                    imageVector = AppIcons.Snooze,
                     contentDescription = null,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.size(10.dp))
                 Text(
                     text = stringResource(R.string.snooze),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
             }

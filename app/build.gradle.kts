@@ -9,13 +9,17 @@ android {
   compileSdk = 36
   defaultConfig {
     applicationId = "io.github.mikhasrahulia.pixelclock"
-    minSdk = 26
-    targetSdk = 35
-    versionCode = 13
-    versionName = "1.0.0-beta.13"
+    minSdk = 34
+    targetSdk = 36
+    versionCode = 14
+    versionName = "1.0.0-beta.14"
   }
 
-  // Release APK for 64-bit ARM only: that is every phone made after about 2016.
+  androidResources {
+    localeFilters += setOf("en", "pl", "be", "ru", "nl", "es")
+  }
+
+  // Release APK for 64-bit ARM only (Pixel 7 Pro / Tensor G2).
   splits {
     abi {
       isEnable = true
@@ -46,7 +50,14 @@ android {
 
   packaging {
     resources {
-      excludes += "/META-INF/{AL2.0,LGPL2.1}"
+      excludes += setOf(
+        "/META-INF/{AL2.0,LGPL2.1}",
+        "/META-INF/androidx/**",
+        "/META-INF/*.version",
+        "/META-INF/*.kotlin_module",
+        "DebugProbesKt.bin",
+        "kotlin/**/*.kotlin_builtins"
+      )
     }
   }
 }
@@ -62,37 +73,28 @@ dependencies {
 
   // Core Android dependencies
   implementation(libs.androidx.core.ktx)
-  implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.activity.compose)
-
-  // Arch Components
   implementation(libs.androidx.lifecycle.runtime.compose)
-  implementation(libs.androidx.lifecycle.viewmodel.compose)
 
   // Compose
   implementation(libs.androidx.compose.ui)
-  implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.compose.material3)
-  implementation("androidx.compose.material:material-icons-extended")
-  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+  implementation(libs.kotlinx.serialization.json)
+
   // Tooling
   debugImplementation(libs.androidx.compose.ui.tooling)
+
   // Instrumented tests
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-  // Local tests: jUnit, coroutines, Android runner
+  // Local tests
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
 
-  // Instrumented tests: jUnit rules and runners
+  // Instrumented test runners
   androidTestImplementation(libs.androidx.test.core)
   androidTestImplementation(libs.androidx.test.ext.junit)
   androidTestImplementation(libs.androidx.test.runner)
   androidTestImplementation(libs.androidx.test.espresso.core)
-
-  // Navigation
-  implementation(libs.androidx.navigation3.ui)
-  implementation(libs.androidx.navigation3.runtime)
-  implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 }

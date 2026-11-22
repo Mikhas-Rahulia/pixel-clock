@@ -2,6 +2,7 @@ package io.github.mikhasrahulia.pixelclock.ui.main
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -20,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import io.github.mikhasrahulia.pixelclock.alarm.AlarmScheduler
 import io.github.mikhasrahulia.pixelclock.data.AlarmRepository
@@ -39,6 +41,12 @@ fun MainScreen(modifier: Modifier = Modifier) {
     val timerManager = remember { TimerManager.getInstance(context) }
     val gate = remember { ModalGate() }
     var selectedTab by remember { mutableStateOf(AppTab.ALARM) }
+
+    val navBarAlpha by animateFloatAsState(
+        targetValue = if (gate.depth == 0) 1f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "navBarAlpha"
+    )
 
     CompositionLocalProvider(LocalModalGate provides gate) {
         Column(
@@ -79,15 +87,15 @@ fun MainScreen(modifier: Modifier = Modifier) {
                     )
                 }
             }
-            if (gate.depth == 0) {
-                ExpressiveNavBar(
-                    selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                )
-            }
+            // Keep ExpressiveNavBar in layout to prevent background reflow during predictive back
+            ExpressiveNavBar(
+                selectedTab = selectedTab,
+                onTabSelected = { if (gate.depth == 0) selectedTab = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .graphicsLayer { alpha = navBarAlpha }
+            )
         }
     }
 }

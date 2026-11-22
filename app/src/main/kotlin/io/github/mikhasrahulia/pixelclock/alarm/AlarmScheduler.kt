@@ -4,26 +4,27 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 import io.github.mikhasrahulia.pixelclock.MainActivity
 import io.github.mikhasrahulia.pixelclock.data.AlarmModel
 import io.github.mikhasrahulia.pixelclock.data.AlarmRepository
+import java.time.LocalDateTime
 
 class AlarmScheduler(private val context: Context) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-    fun scheduleAlarm(alarm: AlarmModel) {
+    fun scheduleAlarm(alarm: AlarmModel, from: LocalDateTime = LocalDateTime.now()) {
         if (!alarm.isEnabled) {
             cancelAlarm(alarm.id)
             return
         }
 
-        // Null means this alarm will not ring (a dated alarm that falls inside its pause)
-        val triggerMillis = alarm.nextTriggerMillisOrNull() ?: run {
+        // Null means this alarm will not ring (e.g. a dated alarm that falls inside its pause)
+        val triggerMillis = alarm.nextTriggerMillisOrNull(from) ?: run {
             cancelAlarm(alarm.id)
             return
         }
+
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             action = ACTION_ALARM_FIRE
             putExtra(EXTRA_ALARM_ID, alarm.id)
@@ -37,7 +38,6 @@ class AlarmScheduler(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // ShowIntent: clicking the clock icon in the status bar opens MainActivity
         val showIntent = PendingIntent.getActivity(
             context,
             alarm.id.hashCode() + 1000,
@@ -46,47 +46,73 @@ class AlarmScheduler(private val context: Context) {
         )
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                alarmManager.setAlarmClock(
-                    AlarmManager.AlarmClockInfo(triggerMillis, showIntent),
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerMillis, pendingIntent)
-            }
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(triggerMillis, showIntent),
+                pendingIntent
+            )
             Log.d(TAG, "Scheduled alarm ${alarm.id} for $triggerMillis")
         } catch (e: SecurityException) {
             Log.e(TAG, "Exact alarm permission missing", e)
-            try {
+            runCatching {
                 alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMillis, pendingIntent)
-            } catch (ex: Exception) {
-                ex.printStackTrace()
             }
         }
     }
 
+    fun scheduleSnooze(alarmId: String, alarmLabel: String, triggerMillis: Long) {
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = ACTION_ALARM_FIRE
+            putExtra(EXTRA_ALARM_ID, alarmId)
+            putExtra(EXTRA_ALARM_LABEL, alarmLabel)
+            putExtra(EXTRA_IS_SNOOZE, true)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            snoozeRequestCode(alarmId),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val showIntent = PendingIntent.getActivity(
+            context,
+            alarmId.hashCode() + 1001,
+            Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        runCatching {
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(triggerMillis, showIntent),
+                pendingIntent
+            )
+            Log.d(TAG, "Scheduled snooze for $alarmId at $triggerMillis")
+        }.onFailure { Log.e(TAG, "Failed to schedule snooze", it) }
+    }
+
     fun cancelAlarm(alarmId: String) {
+        cancelRequest(alarmId, alarmId.hashCode())
+        cancelRequest(alarmId, snoozeRequestCode(alarmId))
+    }
+
+    private fun cancelRequest(alarmId: String, requestCode: Int) {
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             action = ACTION_ALARM_FIRE
             putExtra(EXTRA_ALARM_ID, alarmId)
         }
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            alarmId.hashCode(),
+            requestCode,
             intent,
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
         )
         if (pendingIntent != null) {
             alarmManager.cancel(pendingIntent)
             pendingIntent.cancel()
-            Log.d(TAG, "Canceled alarm $alarmId")
+            Log.d(TAG, "Canceled alarm $alarmId (code=$requestCode)")
         }
     }
 
     fun rescheduleAllAlarms() {
         val repository = AlarmRepository.getInstance(context)
-        val alarms = repository.alarms.value
-        for (alarm in alarms) {
+        for (alarm in repository.alarms.value) {
             if (alarm.isEnabled) {
                 scheduleAlarm(alarm)
             } else {
@@ -95,13 +121,17 @@ class AlarmScheduler(private val context: Context) {
         }
     }
 
+    private fun snoozeRequestCode(alarmId: String): Int = (alarmId + "_snooze").hashCode()
+
     companion object {
         const val TAG = "AlarmScheduler"
         const val ACTION_ALARM_FIRE = "io.github.mikhasrahulia.pixelclock.ACTION_ALARM_FIRE"
         const val ACTION_ALARM_DISMISS = "io.github.mikhasrahulia.pixelclock.ACTION_ALARM_DISMISS"
         const val ACTION_ALARM_SNOOZE = "io.github.mikhasrahulia.pixelclock.ACTION_ALARM_SNOOZE"
+        const val ACTION_ALARM_DISMISSED = "io.github.mikhasrahulia.pixelclock.ACTION_ALARM_DISMISSED"
         const val EXTRA_ALARM_ID = "extra_alarm_id"
         const val EXTRA_ALARM_LABEL = "extra_alarm_label"
+        const val EXTRA_IS_SNOOZE = "extra_is_snooze"
 
         @Volatile
         private var instance: AlarmScheduler? = null
