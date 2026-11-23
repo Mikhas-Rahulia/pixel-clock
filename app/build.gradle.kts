@@ -11,8 +11,8 @@ android {
     applicationId = "io.github.mikhasrahulia.pixelclock"
     minSdk = 34
     targetSdk = 36
-    versionCode = 15
-    versionName = "1.0.0-beta.15"
+    versionCode = 16
+    versionName = "1.0.0"
   }
 
   androidResources {
