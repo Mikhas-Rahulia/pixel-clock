@@ -5,11 +5,21 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +44,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,7 +57,10 @@ import androidx.core.content.ContextCompat
 import io.github.mikhasrahulia.pixelclock.R
 import io.github.mikhasrahulia.pixelclock.data.TimerModel
 import io.github.mikhasrahulia.pixelclock.ui.components.AppIcons
+import io.github.mikhasrahulia.pixelclock.ui.components.ScallopedShape
 import io.github.mikhasrahulia.pixelclock.ui.theme.PixelClockTheme
+
+private val TimerDoneBadgeShape = ScallopedShape(lobes = 10, depthFraction = 0.085f)
 
 class TimerRingingActivity : ComponentActivity() {
     private var timerId by mutableStateOf("")
@@ -133,6 +150,27 @@ private fun TimerDoneScreen(
     onStop: () -> Unit
 ) {
     BackHandler { /* A back swipe should not hide the ringing alert. */ }
+    val view = LocalView.current
+
+    val infiniteTransition = rememberInfiniteTransition(label = "timerDone")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(16_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
 
     Column(
         modifier = Modifier
@@ -143,17 +181,29 @@ private fun TimerDoneScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(36.dp))
-        Icon(
-            imageVector = AppIcons.HourglassBottom,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(56.dp)
-        )
-        Spacer(modifier = Modifier.height(20.dp))
+        Box(
+            modifier = Modifier.size(112.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .scale(pulseScale)
+                    .rotate(rotation)
+                    .clip(TimerDoneBadgeShape)
+                    .background(MaterialTheme.colorScheme.tertiaryContainer)
+            )
+            Icon(
+                imageVector = AppIcons.HourglassBottom,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.size(46.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(22.dp))
         Text(
             text = label.ifBlank { stringResource(R.string.time_up) },
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
@@ -170,8 +220,8 @@ private fun TimerDoneScreen(
             Text(
                 text = durationLabel,
                 style = MaterialTheme.typography.displayLarge.copy(
-                    fontSize = 76.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontSize = 78.sp,
+                    lineHeight = 82.sp,
                     letterSpacing = (-2).sp
                 ),
                 color = MaterialTheme.colorScheme.primary
@@ -180,12 +230,12 @@ private fun TimerDoneScreen(
         if (statText != null) {
             Spacer(modifier = Modifier.height(14.dp))
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.secondaryContainer
             ) {
                 Text(
                     text = statText,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -194,11 +244,14 @@ private fun TimerDoneScreen(
         }
         Spacer(modifier = Modifier.weight(1f))
         Button(
-            onClick = onStop,
+            onClick = {
+                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                onStop()
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(68.dp),
-            shape = RoundedCornerShape(34.dp),
+                .height(72.dp),
+            shape = RoundedCornerShape(36.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
@@ -214,11 +267,18 @@ private fun TimerDoneScreen(
         }
         Spacer(modifier = Modifier.height(14.dp))
         FilledTonalButton(
-            onClick = onSnooze,
+            onClick = {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                onSnooze()
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(58.dp),
-            shape = RoundedCornerShape(29.dp)
+                .height(60.dp),
+            shape = RoundedCornerShape(30.dp),
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            )
         ) {
             Icon(AppIcons.Snooze, contentDescription = null, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.size(10.dp))

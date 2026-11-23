@@ -98,4 +98,11 @@
 
     <string name="today">Сёння</string>
     <string name="tomorrow">Заўтра</string>
+
+    <string name="backup_export">Экспарт будзільнікаў (JSON)</string>
+    <string name="backup_import">Імпарт будзільнікаў (JSON)</string>
+    <string name="backup_exported">Будзільнікі экспартаваныя</string>
+    <string name="backup_imported">Імпартавана будзільнікаў: %1$d</string>
+    <string name="backup_failed">Не ўдалося прачытаць файл копіі</string>
+    <string name="more_options">Яшчэ</string>
 </resources>

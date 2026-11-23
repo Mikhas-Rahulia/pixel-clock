@@ -1,41 +1,61 @@
 package io.github.mikhasrahulia.pixelclock.ui.alarm
 
-import androidx.activity.compose.BackHandler
+import android.view.HapticFeedbackConstants
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -48,14 +68,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,42 +86,49 @@ import io.github.mikhasrahulia.pixelclock.data.AlarmRepository
 import io.github.mikhasrahulia.pixelclock.ui.components.AppIcons
 import io.github.mikhasrahulia.pixelclock.ui.components.ExpressiveDatePickerDialog
 import io.github.mikhasrahulia.pixelclock.ui.components.ExpressiveDateRangePickerDialog
+import io.github.mikhasrahulia.pixelclock.ui.components.ExpressiveSwitch
 import io.github.mikhasrahulia.pixelclock.ui.components.ExpressiveTimePickerDialog
+import io.github.mikhasrahulia.pixelclock.ui.components.ScallopedShape
+import io.github.mikhasrahulia.pixelclock.ui.components.groupedCardShape
+import io.github.mikhasrahulia.pixelclock.ui.theme.ExpressiveMotion
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.hypot
 
-private val CardShape = RoundedCornerShape(28.dp)
-private val InnerCardShape = RoundedCornerShape(20.dp)
-private val PillShape = RoundedCornerShape(20.dp)
-private val ActionButtonShape = RoundedCornerShape(24.dp)
+private val ScallopedBadgeShape = ScallopedShape(lobes = 10, depthFraction = 0.08f)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlarmScreen(
     repository: AlarmRepository,
     scheduler: AlarmScheduler,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val view = LocalView.current
     val storedAlarms by repository.alarms.collectAsStateWithLifecycle()
     val alarms = remember(storedAlarms) {
         storedAlarms.sortedBy { it.hour * 60 + it.minute }
     }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
     var isCreatingAlarm by remember { mutableStateOf(false) }
-    var expandedAlarmId by remember { mutableStateOf<String?>(null) }
+    var editingAlarmId by remember { mutableStateOf<String?>(null) }
     var editingTimeAlarm by remember { mutableStateOf<AlarmModel?>(null) }
     var pickingDateAlarm by remember { mutableStateOf<AlarmModel?>(null) }
     var pausingAlarmId by remember { mutableStateOf<String?>(null) }
-    val focusManager = LocalFocusManager.current
+    var menuExpanded by remember { mutableStateOf(false) }
 
-    // Periodic 30s minute tick so "upcoming alarm" and Today/Tomorrow never go stale
+    // Periodic 30s tick so upcoming alarm banner & relative countdowns stay fresh
     var minuteTick by remember { mutableLongStateOf(System.currentTimeMillis() / 30_000L) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -113,28 +137,151 @@ fun AlarmScreen(
         }
     }
 
-    BackHandler(enabled = expandedAlarmId != null) {
-        focusManager.clearFocus()
-        expandedAlarmId = null
+    // Zero-permission SAF JSON Export & Import launchers
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            coroutineScope.launch {
+                val ok = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val payload = repository.exportAlarmsJson()
+                        context.contentResolver.openOutputStream(uri)?.use { out ->
+                            out.write(payload.toByteArray(Charsets.UTF_8))
+                            out.flush()
+                        }
+                        true
+                    }.getOrDefault(false)
+                }
+                snackbarHostState.showSnackbar(
+                    context.getString(if (ok) R.string.backup_exported else R.string.backup_failed)
+                )
+            }
+        }
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) }
-    ) {
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            coroutineScope.launch {
+                val added = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val raw = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                            ?: return@runCatching -1
+                        val count = repository.importAlarmsJson(raw)
+                        if (count >= 0) scheduler.rescheduleAllAlarms()
+                        count
+                    }.getOrDefault(-1)
+                }
+                snackbarHostState.showSnackbar(
+                    if (added >= 0) context.getString(R.string.backup_imported, added)
+                    else context.getString(R.string.backup_failed)
+                )
+            }
+        }
+    }
+
+    // Soonest upcoming enabled alarm summary for the header banner
+    val nextAlarmBanner = remember(alarms, minuteTick) {
+        val nowInstant = Instant.now()
+        alarms
+            .filter { it.isEnabled }
+            .mapNotNull { alarm -> alarm.nextTriggerMillisOrNull()?.let { alarm to it } }
+            .minByOrNull { it.second }
+            ?.let { (alarm, triggerMillis) ->
+                val formattedWhen = alarm.getFormattedNextOccurrence(context)
+                val relative = formatRelativeDuration(nowInstant, Instant.ofEpochMilli(triggerMillis))
+                if (formattedWhen.isNotBlank()) "$formattedWhen · $relative" else relative
+            }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
-            Text(
-                text = stringResource(R.string.tab_alarm),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = 12.dp, bottom = 12.dp, start = 4.dp)
-            )
+            // Expressive Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 6.dp, start = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.tab_alarm),
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            imageVector = AppIcons.MoreVert,
+                            contentDescription = stringResource(R.string.more_options),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                        shape = RoundedCornerShape(20.dp),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.backup_export)) },
+                            onClick = {
+                                menuExpanded = false
+                                exportLauncher.launch("alarms-backup.json")
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.backup_import)) },
+                            onClick = {
+                                menuExpanded = false
+                                importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Live Next Alarm Pill
+            AnimatedVisibility(
+                visible = nextAlarmBanner != null,
+                enter = fadeIn(ExpressiveMotion.fastEffects()) +
+                    expandVertically(ExpressiveMotion.defaultSpatial()),
+                exit = fadeOut(ExpressiveMotion.fastEffects()) +
+                    shrinkVertically(ExpressiveMotion.defaultSpatial())
+            ) {
+                nextAlarmBanner?.let { banner ->
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = AppIcons.Alarm,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = banner,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
 
             if (alarms.isEmpty()) {
                 Box(
@@ -144,16 +291,24 @@ fun AlarmScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = AppIcons.Alarm,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(116.dp)
+                                .clip(ScallopedBadgeShape)
+                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = AppIcons.Alarm,
+                                contentDescription = null,
+                                modifier = Modifier.size(44.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(18.dp))
                         Text(
                             text = stringResource(R.string.no_alarms),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -168,15 +323,14 @@ fun AlarmScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(alarms, key = { it.id }) { alarm ->
-                        val isExpanded = expandedAlarmId == alarm.id
-
+                        val isSelected = editingAlarmId == alarm.id
                         ExpressiveAlarmCard(
                             alarm = alarm,
                             minuteTick = minuteTick,
-                            isExpanded = isExpanded,
-                            onToggleExpand = {
-                                focusManager.clearFocus()
-                                expandedAlarmId = if (isExpanded) null else alarm.id
+                            isSelected = isSelected,
+                            onClick = {
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                editingAlarmId = alarm.id
                             },
                             onToggleEnabled = { enabled ->
                                 val updated = repository.toggleAlarm(alarm.id, enabled)
@@ -185,27 +339,6 @@ fun AlarmScreen(
                                     else scheduler.cancelAlarm(alarm.id)
                                 }
                             },
-                            onUpdateAlarm = { updated ->
-                                repository.updateAlarm(updated)
-                                scheduler.scheduleAlarm(updated)
-                            },
-                            onUpdateLabelOnly = { updated ->
-                                repository.updateAlarm(updated)
-                            },
-                            onShiftCycle = {
-                                val updated = repository.shiftAlarmCycle(alarm.id)
-                                if (updated != null) {
-                                    scheduler.scheduleAlarm(updated)
-                                }
-                            },
-                            onEditTime = { editingTimeAlarm = alarm },
-                            onPickDate = { pickingDateAlarm = alarm },
-                            onPickPause = { pausingAlarmId = alarm.id },
-                            onDelete = {
-                                if (expandedAlarmId == alarm.id) expandedAlarmId = null
-                                scheduler.cancelAlarm(alarm.id)
-                                repository.deleteAlarm(alarm.id)
-                            },
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -213,15 +346,26 @@ fun AlarmScreen(
             }
         }
 
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 16.dp, vertical = 88.dp)
+        )
+
+        // Material 3 Expressive Rounded-Square Large FAB
         FloatingActionButton(
-            onClick = { isCreatingAlarm = true },
+            onClick = {
+                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                isCreatingAlarm = true
+            },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 20.dp)
+                .padding(end = 20.dp, bottom = 16.dp)
                 .size(64.dp),
             shape = RoundedCornerShape(22.dp),
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
         ) {
             Icon(
                 imageVector = AppIcons.Add,
@@ -231,6 +375,60 @@ fun AlarmScreen(
         }
     }
 
+    // Material 3 Expressive Bottom Sheet Alarm Editor (zero card-blink, native predictive back)
+    editingAlarmId?.let { activeId ->
+        val activeAlarm = alarms.firstOrNull { it.id == activeId }
+        if (activeAlarm == null) {
+            editingAlarmId = null
+        } else {
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
+                onDismissRequest = { editingAlarmId = null },
+                sheetState = sheetState,
+                shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                dragHandle = {
+                    BottomSheetDefaults.DragHandle(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    )
+                }
+            ) {
+                AlarmEditorSheetContent(
+                    alarm = activeAlarm,
+                    minuteTick = minuteTick,
+                    onEditTime = { editingTimeAlarm = activeAlarm },
+                    onUpdateAlarm = { updated ->
+                        repository.updateAlarm(updated)
+                        scheduler.scheduleAlarm(updated)
+                    },
+                    onUpdateLabelOnly = { updated ->
+                        repository.updateAlarm(updated)
+                    },
+                    onShiftCycle = {
+                        val updated = repository.shiftAlarmCycle(activeAlarm.id)
+                        if (updated != null) {
+                            scheduler.scheduleAlarm(updated)
+                        }
+                    },
+                    onPickDate = { pickingDateAlarm = activeAlarm },
+                    onPickPause = { pausingAlarmId = activeAlarm.id },
+                    onDelete = {
+                        editingAlarmId = null
+                        scheduler.cancelAlarm(activeAlarm.id)
+                        repository.deleteAlarm(activeAlarm.id)
+                    },
+                    onDone = {
+                        coroutineScope.launch {
+                            sheetState.hide()
+                            editingAlarmId = null
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    // Create new alarm dialog
     if (isCreatingAlarm) {
         val nextSlot = remember { AlarmModel.nextHourSlot() }
         ExpressiveTimePickerDialog(
@@ -247,8 +445,8 @@ fun AlarmScreen(
                 )
                 repository.addAlarm(newAlarm)
                 scheduler.scheduleAlarm(newAlarm)
-                expandedAlarmId = newAlarm.id
                 isCreatingAlarm = false
+                editingAlarmId = newAlarm.id
                 coroutineScope.launch {
                     val idx = alarms.indexOfFirst { it.id == newAlarm.id }.coerceAtLeast(0)
                     listState.animateScrollToItem(idx)
@@ -258,12 +456,13 @@ fun AlarmScreen(
         )
     }
 
+    // Edit alarm time dialog
     editingTimeAlarm?.let { alarmToEdit ->
         ExpressiveTimePickerDialog(
             initialHour = alarmToEdit.hour,
             initialMinute = alarmToEdit.minute,
             onConfirm = { hour, minute ->
-                val updated = alarmToEdit.copy(hour = hour, minute = minute)
+                val updated = alarmToEdit.copy(hour = hour, minute = minute, isEnabled = true)
                 repository.updateAlarm(updated)
                 scheduler.scheduleAlarm(updated)
                 editingTimeAlarm = null
@@ -272,6 +471,7 @@ fun AlarmScreen(
         )
     }
 
+    // Pick specific one-time date dialog
     pickingDateAlarm?.let { alarmToPick ->
         val currentSelected = alarmToPick.specificDate?.let { dateStr ->
             runCatching {
@@ -294,6 +494,7 @@ fun AlarmScreen(
         )
     }
 
+    // Pick pause range dialog
     pausingAlarmId?.let { alarmId ->
         val alarm = alarms.firstOrNull { it.id == alarmId }
         if (alarm != null) {
@@ -311,32 +512,33 @@ fun AlarmScreen(
                     scheduler.scheduleAlarm(updated)
                     pausingAlarmId = null
                 },
-                onClear = {
-                    val updated = alarm.copy(pauseFrom = null, pauseUntil = null)
-                    repository.updateAlarm(updated)
-                    scheduler.scheduleAlarm(updated)
-                    pausingAlarmId = null
-                },
+                onClear = if (alarm.pauseRange() != null) {
+                    {
+                        val updated = alarm.copy(pauseFrom = null, pauseUntil = null)
+                        repository.updateAlarm(updated)
+                        scheduler.scheduleAlarm(updated)
+                        pausingAlarmId = null
+                    }
+                } else null,
                 onDismiss = { pausingAlarmId = null }
             )
         }
     }
 }
 
+/**
+ * Material 3 Expressive Alarm Card.
+ * - Uses native clipped Surface ripple (no unclipped drawBehind square, no blinking).
+ * - Smoothly shifts color and corner radius across Disabled -> Enabled -> Selected states.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ExpressiveAlarmCard(
     alarm: AlarmModel,
     minuteTick: Long,
-    isExpanded: Boolean,
-    onToggleExpand: () -> Unit,
+    isSelected: Boolean,
+    onClick: () -> Unit,
     onToggleEnabled: (Boolean) -> Unit,
-    onUpdateAlarm: (AlarmModel) -> Unit,
-    onUpdateLabelOnly: (AlarmModel) -> Unit,
-    onShiftCycle: () -> Unit,
-    onEditTime: () -> Unit,
-    onPickDate: () -> Unit,
-    onPickPause: () -> Unit,
-    onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -345,41 +547,20 @@ fun ExpressiveAlarmCard(
     val daysSummary = remember(alarm.daysOfWeek, alarm.specificDate, alarm.hour, alarm.minute, minuteTick) {
         alarm.getDaysSummary(context)
     }
-    val nextOccurrence = remember(alarm, minuteTick) {
-        val nextMillis = alarm.nextTriggerMillisOrNull()
-        if (nextMillis != null) {
-            val diff = Duration.between(Instant.now(), Instant.ofEpochMilli(nextMillis))
-            val totalMins = diff.toMinutes().coerceAtLeast(1L)
-            val days = totalMins / (24 * 60)
-            val hours = (totalMins % (24 * 60)) / 60
-            val minutes = totalMins % 60
-            when {
-                days > 0 -> "${days}d ${hours}h"
-                hours > 0 -> "${hours}h ${minutes}m"
-                else -> "${minutes}m"
-            }
-        } else ""
-    }
     val formattedTime = remember(alarm.hour, alarm.minute) {
         String.format(Locale.getDefault(), "%02d:%02d", alarm.hour, alarm.minute)
     }
-
-    val pauseRange = remember(alarm.pauseFrom, alarm.pauseUntil) {
-        if (!alarm.pauseFrom.isNullOrBlank() && !alarm.pauseUntil.isNullOrBlank()) {
-            runCatching {
-                LocalDate.parse(alarm.pauseFrom) to LocalDate.parse(alarm.pauseUntil)
-            }.getOrNull()
-        } else null
+    val relativeCountdown = remember(alarm, minuteTick) {
+        if (!alarm.isEnabled) ""
+        else alarm.nextTriggerMillisOrNull()?.let { millis ->
+            formatRelativeDuration(Instant.now(), Instant.ofEpochMilli(millis))
+        }.orEmpty()
     }
 
+    val pauseRange = remember(alarm.pauseFrom, alarm.pauseUntil) { alarm.pauseRange() }
     val pauseDayFormat = remember { DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()) }
-    val pauseRangeFormatted: String? = pauseRange?.let { (from, until) ->
-        if (from == until) from.format(pauseDayFormat)
-        else "${from.format(pauseDayFormat)} – ${until.format(pauseDayFormat)}"
-    }
-
     val today = remember(minuteTick) { LocalDate.now() }
-    val pauseText: String? = pauseRange?.let { (from, until) ->
+    val pauseText: String? = pauseRange?.takeIf { !it.second.isBefore(today) }?.let { (from, until) ->
         when {
             !from.isAfter(today) && until == today -> stringResource(R.string.pause_today)
             !from.isAfter(today) -> stringResource(R.string.pause_until, until.format(pauseDayFormat))
@@ -392,24 +573,212 @@ fun ExpressiveAlarmCard(
         }
     }
 
-    // Material You Dynamic Color styling:
-    // Enabled alarms use vibrant primaryContainer; Disabled alarms are muted dark grey with dimmed grey digits (NEVER bright!).
-    // Expanding/collapsing keeps the exact same color family with zero jarring flip.
     val isEnabled = alarm.isEnabled
-    val targetContainerColor = if (isEnabled) colorScheme.primaryContainer else colorScheme.surfaceContainerLow
-    val animatedContainerColor by animateColorAsState(
-        targetValue = targetContainerColor,
-        animationSpec = tween(durationMillis = 180),
-        label = "alarmCardContainerColor"
+
+    // Three unmistakable, smoothly animated color states (Disabled / Enabled / Selected)
+    val containerColor by animateColorAsState(
+        targetValue = when {
+            isSelected -> colorScheme.tertiaryContainer
+            isEnabled -> colorScheme.primaryContainer
+            else -> colorScheme.surfaceContainerLow
+        },
+        animationSpec = ExpressiveMotion.fastEffects(),
+        label = "alarmCardBg"
+    )
+    val primaryTextColor by animateColorAsState(
+        targetValue = when {
+            isSelected -> colorScheme.onTertiaryContainer
+            isEnabled -> colorScheme.onPrimaryContainer
+            else -> colorScheme.onSurfaceVariant.copy(alpha = 0.52f)
+        },
+        animationSpec = ExpressiveMotion.fastEffects(),
+        label = "alarmCardTitle"
+    )
+    val secondaryTextColor by animateColorAsState(
+        targetValue = when {
+            isSelected -> colorScheme.onTertiaryContainer.copy(alpha = 0.80f)
+            isEnabled -> colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
+            else -> colorScheme.onSurfaceVariant.copy(alpha = 0.42f)
+        },
+        animationSpec = ExpressiveMotion.fastEffects(),
+        label = "alarmCardSub"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isSelected -> colorScheme.tertiary
+            isEnabled -> Color.Transparent
+            else -> colorScheme.outlineVariant.copy(alpha = 0.18f)
+        },
+        animationSpec = ExpressiveMotion.fastEffects(),
+        label = "alarmCardBorder"
+    )
+    val cornerRadius by animateDpAsState(
+        targetValue = if (isSelected) 20.dp else 28.dp,
+        animationSpec = ExpressiveMotion.fastSpatial(),
+        label = "alarmCardCorner"
     )
 
-    val primaryTextColor = if (isEnabled) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariant.copy(alpha = 0.48f)
-    val secondaryTextColor = if (isEnabled) colorScheme.onPrimaryContainer.copy(alpha = 0.78f) else colorScheme.onSurfaceVariant.copy(alpha = 0.36f)
-    val innerSurfaceColor = if (isEnabled) colorScheme.surface.copy(alpha = 0.22f) else colorScheme.surfaceContainer
-    val pillBg = if (isEnabled) colorScheme.primary else colorScheme.surfaceContainerHigh
-    val pillText = if (isEnabled) colorScheme.onPrimary else colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    val hasLabel = alarm.label.isNotBlank() && !alarm.label.equals(daysSummary, ignoreCase = true)
 
-    // Buffered label editing to avoid disk I/O + recomposition on every keystroke
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(cornerRadius),
+        color = containerColor,
+        border = if (borderColor != Color.Transparent) BorderStroke(1.5.dp, borderColor) else null,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp, vertical = 18.dp)
+        ) {
+            // Top schedule + optional status pills
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                itemVerticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (alarm.isBiWeekly) {
+                        "${stringResource(R.string.repeat_biweekly)} · $daysSummary"
+                    } else {
+                        daysSummary
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = secondaryTextColor
+                )
+
+                if (alarm.isBiWeekly) {
+                    val weekStatus = stringResource(
+                        if (alarm.isCurrentWeekActive()) R.string.active_this_week else R.string.active_next_week
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (isEnabled || isSelected) {
+                            primaryTextColor.copy(alpha = 0.14f)
+                        } else {
+                            colorScheme.surfaceContainerHigh
+                        }
+                    ) {
+                        Text(
+                            text = weekStatus,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = primaryTextColor,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                if (isEnabled && pauseText != null) {
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = colorScheme.tertiaryContainer
+                    ) {
+                        Text(
+                            text = pauseText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colorScheme.onTertiaryContainer,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+            }
+
+            if (hasLabel) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = alarm.label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = primaryTextColor.copy(alpha = 0.9f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Hero time + relative countdown + M3E Switch
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = formattedTime,
+                        style = MaterialTheme.typography.displayMedium.copy(
+                            fontSize = 54.sp,
+                            lineHeight = 58.sp
+                        ),
+                        color = primaryTextColor
+                    )
+                    if (relativeCountdown.isNotBlank()) {
+                        Text(
+                            text = relativeCountdown,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = secondaryTextColor,
+                            modifier = Modifier.padding(bottom = 10.dp)
+                        )
+                    }
+                }
+
+                ExpressiveSwitch(
+                    checked = isEnabled,
+                    onCheckedChange = onToggleEnabled,
+                    checkedTrackColor = if (isSelected) colorScheme.tertiary else colorScheme.primary,
+                    checkedThumbColor = if (isSelected) colorScheme.onTertiary else colorScheme.onPrimary,
+                    checkedIconColor = if (isSelected) colorScheme.tertiary else colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Material 3 Expressive Alarm Editor Bottom Sheet.
+ * Replaces inline card expansion for zero layout jump, generous touch targets,
+ * shape-morphing day pills, grouped M3E settings list, and 1-tap bi-weekly week switching.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun AlarmEditorSheetContent(
+    alarm: AlarmModel,
+    minuteTick: Long,
+    onEditTime: () -> Unit,
+    onUpdateAlarm: (AlarmModel) -> Unit,
+    onUpdateLabelOnly: (AlarmModel) -> Unit,
+    onShiftCycle: () -> Unit,
+    onPickDate: () -> Unit,
+    onPickPause: () -> Unit,
+    onDelete: () -> Unit,
+    onDone: () -> Unit
+) {
+    val context = LocalContext.current
+    val view = LocalView.current
+    val colorScheme = MaterialTheme.colorScheme
+
+    val formattedTime = remember(alarm.hour, alarm.minute) {
+        String.format(Locale.getDefault(), "%02d:%02d", alarm.hour, alarm.minute)
+    }
+    val daysSummary = remember(alarm.daysOfWeek, alarm.specificDate, alarm.hour, alarm.minute, minuteTick) {
+        alarm.getDaysSummary(context)
+    }
+    val nextOccurrence = remember(alarm, minuteTick) {
+        alarm.nextTriggerMillisOrNull()?.let { millis ->
+            formatRelativeDuration(Instant.now(), Instant.ofEpochMilli(millis))
+        }.orEmpty()
+    }
+
+    val pauseRange = remember(alarm.pauseFrom, alarm.pauseUntil) { alarm.pauseRange() }
+    val pauseDayFormat = remember { DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()) }
+    val pauseRangeFormatted: String? = pauseRange?.let { (from, until) ->
+        if (from == until) from.format(pauseDayFormat)
+        else "${from.format(pauseDayFormat)} – ${until.format(pauseDayFormat)}"
+    }
+
     var labelDraft by remember(alarm.id) { mutableStateOf(alarm.label) }
     LaunchedEffect(alarm.label) {
         if (alarm.label != labelDraft) labelDraft = alarm.label
@@ -419,508 +788,420 @@ fun ExpressiveAlarmCard(
             onUpdateLabelOnly(alarm.copy(label = labelDraft))
         }
     }
-    DisposableEffect(alarm.id, isExpanded) {
-        onDispose {
-            if (isExpanded) commitLabelIfChanged()
-        }
+    DisposableEffect(alarm.id) {
+        onDispose { commitLabelIfChanged() }
     }
 
-    var tapCenter by remember { mutableStateOf<Offset?>(null) }
-    var touchAnim by remember { mutableStateOf(false) }
-    val rippleScale by animateFloatAsState(
-        targetValue = if (touchAnim) 1f else 0f,
-        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-        label = "alarmRipple",
-        finishedListener = { touchAnim = false }
-    )
+    val cardRepeating = alarm.daysOfWeek.isNotEmpty() && alarm.specificDate == null
+    val cardPreview = if (cardRepeating) {
+        null
+    } else if (!alarm.specificDate.isNullOrBlank()) {
+        runCatching { LocalDate.parse(alarm.specificDate).dayOfWeek.value }
+            .getOrElse { AlarmModel.oneTimeDate(alarm.hour, alarm.minute).dayOfWeek.value }
+    } else {
+        AlarmModel.oneTimeDate(alarm.hour, alarm.minute).dayOfWeek.value
+    }
 
-    Surface(
-        modifier = modifier
+    Column(
+        modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(spring(stiffness = Spring.StiffnessMedium))
-            .drawBehind {
-                drawRect(animatedContainerColor)
-                if (rippleScale > 0f && rippleScale < 1f) {
-                    val center = tapCenter ?: Offset(size.width / 2f, size.height / 2f)
-                    val maxRadius = hypot(size.width, size.height)
-                    drawCircle(
-                        color = primaryTextColor.copy(alpha = 0.08f),
-                        radius = maxRadius * rippleScale,
-                        center = center
-                    )
-                }
-            },
-        shape = CardShape,
-        color = Color.Transparent
+            .verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 20.dp)
     ) {
-        if (!isExpanded) {
-            Column(
+        // 1. Monumental Clickable Time Display Card
+        Surface(
+            onClick = {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                onEditTime()
+            },
+            shape = RoundedCornerShape(28.dp),
+            color = colorScheme.primaryContainer,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .pointerInput(Unit) {
-                        detectTapGestures { offset ->
-                            tapCenter = offset
-                            touchAnim = true
-                            onToggleExpand()
-                        }
-                    }
-                    .padding(horizontal = 24.dp, vertical = 20.dp)
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val scheduleText = if (alarm.isBiWeekly) {
-                    val weekStatus = stringResource(if (alarm.isCurrentWeekActive()) R.string.active_this_week else R.string.active_next_week)
-                    "${stringResource(R.string.repeat_biweekly)} ($daysSummary · $weekStatus)"
-                } else {
-                    daysSummary
-                }
-                val hasLabel = alarm.label.isNotBlank() && !alarm.label.equals(daysSummary, ignoreCase = true)
-
-                Text(
-                    text = scheduleText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = secondaryTextColor
-                )
-                if (hasLabel) {
-                    Text(
-                        text = alarm.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = secondaryTextColor,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
-                if (alarm.isEnabled && pauseText != null) {
-                    Text(
-                        text = pauseText,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = colorScheme.tertiary,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-
-                Row(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = formattedTime,
-                        style = MaterialTheme.typography.displayMedium.copy(
-                            fontSize = 52.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = (-1).sp
-                        ),
-                        color = primaryTextColor
-                    )
-                    Switch(
-                        checked = alarm.isEnabled,
-                        onCheckedChange = onToggleEnabled,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = colorScheme.onPrimary,
-                            checkedTrackColor = colorScheme.primary,
-                            uncheckedThumbColor = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            uncheckedTrackColor = colorScheme.surfaceContainerHighest,
-                            uncheckedBorderColor = Color.Transparent
-                        )
-                    )
-                }
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp)
-            ) {
-                // Drag handle (tap to collapse)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .pointerInput(Unit) {
-                            detectTapGestures { offset ->
-                                commitLabelIfChanged()
-                                tapCenter = offset
-                                touchAnim = true
-                                onToggleExpand()
-                            }
-                        }
-                        .padding(bottom = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .width(36.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(secondaryTextColor.copy(alpha = 0.5f))
-                    )
-                }
-
-                val cardRepeating = alarm.daysOfWeek.isNotEmpty() && alarm.specificDate == null
-                val cardPreview = if (cardRepeating) {
-                    null
-                } else if (!alarm.specificDate.isNullOrBlank()) {
-                    runCatching { LocalDate.parse(alarm.specificDate).dayOfWeek.value }
-                        .getOrElse { AlarmModel.oneTimeDate(alarm.hour, alarm.minute).dayOfWeek.value }
-                } else {
-                    AlarmModel.oneTimeDate(alarm.hour, alarm.minute).dayOfWeek.value
-                }
-
-                // Time & Edit button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .weight(1f)
+                        .padding(end = 12.dp)
                 ) {
                     Text(
                         text = formattedTime,
                         style = MaterialTheme.typography.displayLarge.copy(
-                            fontSize = 54.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = (-1).sp
+                            fontSize = 62.sp,
+                            lineHeight = 66.sp
                         ),
-                        color = primaryTextColor,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { onEditTime() }
-                            .padding(horizontal = 4.dp)
+                        color = colorScheme.onPrimaryContainer
                     )
-                    Surface(
-                        shape = PillShape,
-                        color = pillBg,
-                        onClick = onEditTime
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (nextOccurrence.isNotBlank()) {
+                            "${stringResource(R.string.upcoming_alarm)} · $nextOccurrence"
+                        } else {
+                            daysSummary
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = colorScheme.primary
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        Icon(
+                            imageVector = AppIcons.Edit,
+                            contentDescription = null,
+                            tint = colorScheme.onPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Text(
                             text = stringResource(R.string.edit),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = pillText,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                            style = MaterialTheme.typography.labelLarge,
+                            color = colorScheme.onPrimary,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
+            }
+        }
 
-                Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
-                // Day of week selector
-                DayOfWeekSelector(
-                    selectedDays = if (cardRepeating) alarm.daysOfWeek else emptySet(),
-                    previewDay = cardPreview,
-                    isEnabled = isEnabled,
-                    onDaysChanged = { newDays ->
-                        val weekly = newDays.isNotEmpty() && (cardPreview == null || newDays != setOf(cardPreview))
-                        if (weekly) {
-                            onUpdateAlarm(
-                                alarm.copy(
-                                    daysOfWeek = newDays,
-                                    specificDate = null,
-                                    isBiWeekly = alarm.isBiWeekly && newDays.isNotEmpty()
-                                )
-                            )
-                        } else {
-                            val onceDate = alarm.specificDate
-                                ?: AlarmModel.oneTimeDate(alarm.hour, alarm.minute)
-                                    .format(DateTimeFormatter.ISO_LOCAL_DATE)
-                            onUpdateAlarm(
-                                alarm.copy(
-                                    daysOfWeek = emptySet(),
-                                    specificDate = onceDate,
-                                    isBiWeekly = false
-                                )
-                            )
-                        }
-                    }
-                )
+        // 2. Shape-Morphing Day of Week Selector
+        ExpressiveDayOfWeekSelector(
+            selectedDays = if (cardRepeating) alarm.daysOfWeek else emptySet(),
+            previewDay = cardPreview,
+            onDaysChanged = { newDays ->
+                val weekly = newDays.isNotEmpty() && (cardPreview == null || newDays != setOf(cardPreview))
+                if (weekly) {
+                    onUpdateAlarm(
+                        alarm.copy(
+                            daysOfWeek = newDays,
+                            specificDate = null,
+                            isBiWeekly = alarm.isBiWeekly && newDays.isNotEmpty()
+                        )
+                    )
+                } else {
+                    val onceDate = alarm.specificDate
+                        ?: AlarmModel.oneTimeDate(alarm.hour, alarm.minute)
+                            .format(DateTimeFormatter.ISO_LOCAL_DATE)
+                    onUpdateAlarm(
+                        alarm.copy(
+                            daysOfWeek = emptySet(),
+                            specificDate = onceDate,
+                            isBiWeekly = false
+                        )
+                    )
+                }
+            }
+        )
 
-                // Dedicated Bi-Weekly Recurrence & Shift 2 Weeks Controls
-                Surface(
-                    shape = InnerCardShape,
-                    color = innerSurfaceColor,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp, bottom = 6.dp)
+        Spacer(modifier = Modifier.height(18.dp))
+
+        // 3. Material 3 Expressive Grouped Settings List (5 contiguous items with outer 24.dp / inner 8.dp corners)
+        val groupItemCount = 5
+        val itemContainer = colorScheme.surfaceContainerHigh
+
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            // Item 0: Every 2 Weeks + Active Week Segmented Switcher
+            Surface(
+                shape = groupedCardShape(0, groupItemCount),
+                color = itemContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 12.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable {
-                                        if (!cardRepeating) {
-                                            val day = cardPreview ?: AlarmModel.oneTimeDate(alarm.hour, alarm.minute).dayOfWeek.value
-                                            onUpdateAlarm(alarm.copy(daysOfWeek = setOf(day), specificDate = null, isBiWeekly = !alarm.isBiWeekly))
-                                        } else {
-                                            onUpdateAlarm(alarm.copy(isBiWeekly = !alarm.isBiWeekly))
-                                        }
-                                    }
-                            ) {
-                                Icon(
-                                    imageVector = AppIcons.Alarm,
-                                    contentDescription = null,
-                                    tint = if (alarm.isBiWeekly) primaryTextColor else secondaryTextColor,
-                                    modifier = Modifier.size(20.dp)
+                            Icon(
+                                imageVector = AppIcons.Repeat,
+                                contentDescription = null,
+                                tint = if (alarm.isBiWeekly) colorScheme.primary else colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column {
+                                Text(
+                                    text = stringResource(R.string.repeat_biweekly),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = colorScheme.onSurface
                                 )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = stringResource(R.string.repeat_biweekly),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = primaryTextColor
-                                    )
-                                    Text(
-                                        text = if (alarm.isBiWeekly) stringResource(R.string.repeat_biweekly) else stringResource(R.string.repeat_weekly),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = secondaryTextColor
-                                    )
+                                Text(
+                                    text = if (alarm.isBiWeekly) {
+                                        stringResource(
+                                            if (alarm.isCurrentWeekActive()) R.string.active_this_week
+                                            else R.string.active_next_week
+                                        )
+                                    } else {
+                                        stringResource(R.string.repeat_weekly)
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (alarm.isBiWeekly) colorScheme.primary else colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        ExpressiveSwitch(
+                            checked = alarm.isBiWeekly,
+                            onCheckedChange = { checked ->
+                                if (!cardRepeating && checked) {
+                                    val day = cardPreview ?: AlarmModel.oneTimeDate(alarm.hour, alarm.minute).dayOfWeek.value
+                                    onUpdateAlarm(alarm.copy(daysOfWeek = setOf(day), specificDate = null, isBiWeekly = true))
+                                } else {
+                                    onUpdateAlarm(alarm.copy(isBiWeekly = checked))
                                 }
                             }
-                            Switch(
-                                checked = alarm.isBiWeekly,
-                                onCheckedChange = { checked ->
-                                    if (!cardRepeating && checked) {
-                                        val day = cardPreview ?: AlarmModel.oneTimeDate(alarm.hour, alarm.minute).dayOfWeek.value
-                                        onUpdateAlarm(alarm.copy(daysOfWeek = setOf(day), specificDate = null, isBiWeekly = true))
-                                    } else {
-                                        onUpdateAlarm(alarm.copy(isBiWeekly = checked))
+                        )
+                    }
+
+                    AnimatedVisibility(
+                        visible = alarm.isBiWeekly,
+                        enter = expandVertically(ExpressiveMotion.defaultSpatial()) + fadeIn(ExpressiveMotion.fastEffects()),
+                        exit = shrinkVertically(ExpressiveMotion.defaultSpatial()) + fadeOut(ExpressiveMotion.fastEffects())
+                    ) {
+                        val isThisWeek = alarm.isCurrentWeekActive()
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp)
+                        ) {
+                            SegmentedButton(
+                                selected = isThisWeek,
+                                onClick = {
+                                    if (!isThisWeek) {
+                                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                        onShiftCycle()
                                     }
                                 },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = colorScheme.onPrimary,
-                                    checkedTrackColor = colorScheme.primary,
-                                    uncheckedThumbColor = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                    uncheckedTrackColor = colorScheme.surfaceContainerHighest,
-                                    uncheckedBorderColor = Color.Transparent
+                                icon = {},
+                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                                colors = SegmentedButtonDefaults.colors(
+                                    activeContainerColor = colorScheme.secondaryContainer,
+                                    activeContentColor = colorScheme.onSecondaryContainer,
+                                    inactiveContainerColor = colorScheme.surfaceContainer,
+                                    inactiveContentColor = colorScheme.onSurfaceVariant
                                 )
-                            )
-                        }
-
-                        if (alarm.isBiWeekly) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = stringResource(R.string.shift_cycle),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = secondaryTextColor
+                                    text = stringResource(R.string.active_this_week),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelSmall
                                 )
-                                Surface(
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = pillBg,
-                                    onClick = onShiftCycle
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = AppIcons.ChevronLeft,
-                                            contentDescription = stringResource(R.string.shift_cycle),
-                                            tint = pillText,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Text(
-                                            text = stringResource(if (alarm.isCurrentWeekActive()) R.string.active_this_week else R.string.active_next_week),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = pillText
-                                        )
-                                        Icon(
-                                            imageVector = AppIcons.ChevronRight,
-                                            contentDescription = stringResource(R.string.shift_cycle),
-                                            tint = pillText,
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                            }
+                            SegmentedButton(
+                                selected = !isThisWeek,
+                                onClick = {
+                                    if (isThisWeek) {
+                                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                        onShiftCycle()
                                     }
-                                }
+                                },
+                                icon = {},
+                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                                colors = SegmentedButtonDefaults.colors(
+                                    activeContainerColor = colorScheme.secondaryContainer,
+                                    activeContentColor = colorScheme.onSecondaryContainer,
+                                    inactiveContainerColor = colorScheme.surfaceContainer,
+                                    inactiveContentColor = colorScheme.onSurfaceVariant
+                                )
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.active_next_week),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
                             }
                         }
                     }
                 }
+            }
 
-                // Upcoming alarm & specific date button
+            // Item 1: Specific Date (One-time date picker)
+            val isDateMode = alarm.specificDate != null
+            Surface(
+                onClick = onPickDate,
+                shape = groupedCardShape(1, groupItemCount),
+                color = itemContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                        Text(
-                            text = stringResource(R.string.upcoming_alarm),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = secondaryTextColor
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = nextOccurrence.ifBlank { daysSummary },
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = primaryTextColor
-                        )
-                    }
-
-                    val isDateMode = alarm.specificDate != null
-                    Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        color = innerSurfaceColor,
-                        onClick = {
-                            if (isDateMode) onUpdateAlarm(alarm.copy(specificDate = null))
-                            else onPickDate()
-                        }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = if (isDateMode) AppIcons.Close else AppIcons.CalendarMonth,
-                                contentDescription = null,
-                                tint = primaryTextColor,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isDateMode) alarm.specificDate.orEmpty() else stringResource(R.string.set_alarm_date),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = primaryTextColor
-                            )
-                        }
-                    }
-                }
-
-                // Pause between dates
-                Surface(
-                    shape = InnerCardShape,
-                    color = innerSurfaceColor,
-                    onClick = onPickPause,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f).padding(end = 8.dp)
+                        Icon(
+                            imageVector = AppIcons.CalendarMonth,
+                            contentDescription = null,
+                            tint = if (isDateMode) colorScheme.primary else colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.set_alarm_date),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (isDateMode) daysSummary else stringResource(R.string.select_date),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isDateMode) colorScheme.primary else colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    if (isDateMode) {
+                        IconButton(
+                            onClick = { onUpdateAlarm(alarm.copy(specificDate = null)) },
+                            modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
-                                imageVector = AppIcons.PauseCircle,
-                                contentDescription = null,
-                                tint = secondaryTextColor,
-                                modifier = Modifier.size(22.dp)
+                                imageVector = AppIcons.Close,
+                                contentDescription = stringResource(R.string.clear_date),
+                                tint = colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = if (pauseRangeFormatted != null) {
-                                        "${stringResource(R.string.pause_title)} ($pauseRangeFormatted)"
-                                    } else {
-                                        stringResource(R.string.pause_button)
-                                    },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = primaryTextColor,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = stringResource(R.string.edit),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = secondaryTextColor
-                                )
-                            }
-                        }
-
-                        if (pauseRange != null) {
-                            Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = pillBg,
-                                onClick = { onUpdateAlarm(alarm.copy(pauseFrom = null, pauseUntil = null)) }
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.cancel),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = pillText,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                                )
-                            }
                         }
                     }
                 }
+            }
 
-                // Alarm Name (buffered input)
-                Surface(
-                    shape = InnerCardShape,
-                    color = innerSurfaceColor,
+            // Item 2: Pause Between Dates
+            Surface(
+                onClick = onPickPause,
+                shape = groupedCardShape(2, groupItemCount),
+                color = itemContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp)
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        ) {
-                            Icon(
-                                imageVector = AppIcons.Label,
-                                contentDescription = null,
-                                tint = secondaryTextColor,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = AppIcons.PauseCircle,
+                            contentDescription = null,
+                            tint = if (pauseRange != null) colorScheme.tertiary else colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
                             Text(
-                                text = stringResource(R.string.alarm_name_title),
+                                text = stringResource(R.string.pause_button),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = colorScheme.onSurface
+                            )
+                            Text(
+                                text = pauseRangeFormatted ?: stringResource(R.string.pause_hint),
                                 style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                color = secondaryTextColor
+                                color = if (pauseRange != null) colorScheme.tertiary else colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
+                    }
+                    if (pauseRange != null) {
+                        Surface(
+                            onClick = { onUpdateAlarm(alarm.copy(pauseFrom = null, pauseUntil = null)) },
+                            shape = RoundedCornerShape(50),
+                            color = colorScheme.tertiaryContainer
+                        ) {
+                            Text(
+                                text = stringResource(R.string.pause_resume),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = colorScheme.onTertiaryContainer,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Item 3: Alarm Label
+            Surface(
+                shape = groupedCardShape(3, groupItemCount),
+                color = itemContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = AppIcons.Label,
+                        contentDescription = null,
+                        tint = colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.alarm_name_title),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
                         BasicTextField(
                             value = labelDraft,
                             onValueChange = { labelDraft = it },
                             textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                color = primaryTextColor,
-                                fontSize = 16.sp
+                                color = colorScheme.onSurface
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 26.dp)
                                 .onFocusChanged { if (!it.isFocused) commitLabelIfChanged() },
                             minLines = 1,
-                            maxLines = 4,
-                            cursorBrush = SolidColor(primaryTextColor),
+                            maxLines = 3,
+                            cursorBrush = SolidColor(colorScheme.primary),
                             decorationBox = { innerTextField ->
                                 if (labelDraft.isEmpty()) {
                                     Text(
                                         text = stringResource(R.string.alarm_name_hint),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = secondaryTextColor.copy(alpha = 0.7f)
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                     )
                                 }
                                 innerTextField()
@@ -928,102 +1209,114 @@ fun ExpressiveAlarmCard(
                         )
                     }
                 }
+            }
 
-                // Vibration toggle
-                Surface(
-                    shape = InnerCardShape,
-                    color = innerSurfaceColor,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp, vertical = 10.dp)
-                            .fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = AppIcons.Vibration,
-                                contentDescription = null,
-                                tint = secondaryTextColor,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = stringResource(R.string.vibration),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = primaryTextColor
-                            )
-                        }
-                        Switch(
-                            checked = alarm.vibrate,
-                            onCheckedChange = { onUpdateAlarm(alarm.copy(vibrate = it)) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = colorScheme.onPrimary,
-                                checkedTrackColor = colorScheme.primary,
-                                uncheckedThumbColor = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                uncheckedTrackColor = colorScheme.surfaceContainerHighest,
-                                uncheckedBorderColor = Color.Transparent
-                            )
-                        )
-                    }
-                }
-
-                // Bottom row: Delete & Save
+            // Item 4: Vibration Toggle
+            Surface(
+                shape = groupedCardShape(4, groupItemCount),
+                color = itemContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 18.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Surface(
-                        shape = ActionButtonShape,
-                        color = colorScheme.errorContainer,
-                        onClick = onDelete
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = AppIcons.Vibration,
+                            contentDescription = null,
+                            tint = if (alarm.vibrate) colorScheme.primary else colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
                         Text(
-                            text = stringResource(R.string.delete),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                            text = stringResource(R.string.vibration),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = colorScheme.onSurface
                         )
                     }
-
-                    Surface(
-                        shape = ActionButtonShape,
-                        color = pillBg,
-                        onClick = {
-                            commitLabelIfChanged()
-                            onToggleExpand()
-                        }
-                    ) {
-                        Text(
-                            text = stringResource(R.string.save),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = pillText,
-                            modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp)
-                        )
-                    }
+                    ExpressiveSwitch(
+                        checked = alarm.vibrate,
+                        onCheckedChange = { onUpdateAlarm(alarm.copy(vibrate = it)) }
+                    )
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // 4. Footer Actions: Delete & Done
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FilledTonalButton(
+                onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.REJECT)
+                    onDelete()
+                },
+                shape = RoundedCornerShape(22.dp),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = colorScheme.errorContainer,
+                    contentColor = colorScheme.onErrorContainer
+                ),
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = AppIcons.Delete,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.delete),
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+
+            Button(
+                onClick = {
+                    commitLabelIfChanged()
+                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    onDone()
+                },
+                shape = RoundedCornerShape(22.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
+                modifier = Modifier.weight(1.3f)
+            ) {
+                Icon(
+                    imageVector = AppIcons.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.save),
+                    style = MaterialTheme.typography.labelLarge
+                )
             }
         }
     }
 }
 
+/**
+ * Material 3 Expressive shape-morphing Day-of-Week toggle pills:
+ * unselected days are soft circles; selected days spring-morph into bold rounded squares in primary color.
+ */
 @Composable
-fun DayOfWeekSelector(
+fun ExpressiveDayOfWeekSelector(
     selectedDays: Set<Int>,
     onDaysChanged: (Set<Int>) -> Unit,
-    previewDay: Int? = null,
-    isEnabled: Boolean = true
+    previewDay: Int? = null
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val view = LocalView.current
+
     val days = listOf(
         1 to stringResource(R.string.day_mon_initial),
         2 to stringResource(R.string.day_tue_initial),
@@ -1037,41 +1330,72 @@ fun DayOfWeekSelector(
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         days.forEach { (dayIndex, dayLabel) ->
             val base = if (oncePreview && previewDay != null) setOf(previewDay) else selectedDays
-            val isSelected = base.contains(dayIndex)
-            val bg = when {
-                isSelected && isEnabled -> colorScheme.primary
-                isSelected -> colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
-                isEnabled -> colorScheme.surface.copy(alpha = 0.24f)
-                else -> colorScheme.surfaceContainer
-            }
-            val fg = when {
-                isSelected && isEnabled -> colorScheme.onPrimary
-                isSelected -> colorScheme.surface
-                isEnabled -> colorScheme.onPrimaryContainer
-                else -> colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
-            }
-            Box(
+            val isSelected = selectedDays.contains(dayIndex)
+            val isPreviewOnly = oncePreview && previewDay == dayIndex
+
+            val corner by animateDpAsState(
+                targetValue = if (isSelected) 14.dp else 22.dp,
+                animationSpec = ExpressiveMotion.fastSpatial(),
+                label = "dayCorner"
+            )
+            val bg by animateColorAsState(
+                targetValue = when {
+                    isSelected -> colorScheme.primary
+                    isPreviewOnly -> colorScheme.secondaryContainer
+                    else -> colorScheme.surfaceContainerHigh
+                },
+                animationSpec = ExpressiveMotion.fastEffects(),
+                label = "dayBg"
+            )
+            val fg by animateColorAsState(
+                targetValue = when {
+                    isSelected -> colorScheme.onPrimary
+                    isPreviewOnly -> colorScheme.onSecondaryContainer
+                    else -> colorScheme.onSurfaceVariant
+                },
+                animationSpec = ExpressiveMotion.fastEffects(),
+                label = "dayFg"
+            )
+
+            Surface(
+                onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    val newSet = if (base.contains(dayIndex)) base - dayIndex else base + dayIndex
+                    onDaysChanged(newSet)
+                },
+                shape = RoundedCornerShape(corner),
+                color = bg,
+                border = if (isPreviewOnly) BorderStroke(1.5.dp, colorScheme.primary.copy(alpha = 0.6f)) else null,
                 modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(bg)
-                    .clickable {
-                        val newSet = if (base.contains(dayIndex)) base - dayIndex else base + dayIndex
-                        onDaysChanged(newSet)
-                    },
-                contentAlignment = Alignment.Center
+                    .weight(1f)
+                    .height(44.dp)
             ) {
-                Text(
-                    text = dayLabel,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = fg
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = dayLabel,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = if (isSelected || isPreviewOnly) FontWeight.Bold else FontWeight.Medium,
+                        color = fg
+                    )
+                }
             }
         }
+    }
+}
+
+private fun formatRelativeDuration(now: Instant, target: Instant): String {
+    val diff = Duration.between(now, target)
+    val totalMins = diff.toMinutes().coerceAtLeast(1L)
+    val days = totalMins / (24 * 60)
+    val hours = (totalMins % (24 * 60)) / 60
+    val minutes = totalMins % 60
+    return when {
+        days > 0 -> "${days}d ${hours}h"
+        hours > 0 -> "${hours}h ${minutes}m"
+        else -> "${minutes}m"
     }
 }

@@ -1,26 +1,19 @@
 package io.github.mikhasrahulia.pixelclock.ui.components
 
+import android.view.HapticFeedbackConstants
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import kotlin.math.floor
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -30,37 +23,34 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DateRangePicker
-import androidx.compose.material3.SelectableDates
-import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimeInput
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDefaults
-import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -74,24 +64,44 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import io.github.mikhasrahulia.pixelclock.R
+import io.github.mikhasrahulia.pixelclock.ui.theme.ExpressiveMotion
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.floor
+import kotlin.math.sin
 
 private val BELL_ANGLES = floatArrayOf(-135f, -45f)
 
@@ -116,12 +126,111 @@ class ModalGate {
 val LocalModalGate = staticCompositionLocalOf { ModalGate() }
 
 /**
+ * Material 3 Expressive segmented-list corner helper:
+ * outer corners use generous 24.dp radii while adjacent inner edges tighten to 8.dp.
+ */
+fun groupedCardShape(
+    index: Int,
+    count: Int,
+    outerRadius: Dp = 24.dp,
+    innerRadius: Dp = 8.dp
+): RoundedCornerShape {
+    if (count <= 1) return RoundedCornerShape(outerRadius)
+    return when (index) {
+        0 -> RoundedCornerShape(
+            topStart = outerRadius,
+            topEnd = outerRadius,
+            bottomStart = innerRadius,
+            bottomEnd = innerRadius
+        )
+        count - 1 -> RoundedCornerShape(
+            topStart = innerRadius,
+            topEnd = innerRadius,
+            bottomStart = outerRadius,
+            bottomEnd = outerRadius
+        )
+        else -> RoundedCornerShape(innerRadius)
+    }
+}
+
+/**
+ * Material 3 Expressive scalloped / soft-cookie shape for badges, empty states, and ringing hero icons.
+ */
+class ScallopedShape(
+    private val lobes: Int = 10,
+    private val depthFraction: Float = 0.085f
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val baseRadius = minOf(cx, cy) * (1f - depthFraction)
+        val amp = minOf(cx, cy) * depthFraction
+        val steps = lobes * 16
+        val path = Path()
+        for (i in 0..steps) {
+            val theta = (2.0 * PI * i) / steps
+            val r = baseRadius + amp * cos(lobes * theta).toFloat()
+            val x = cx + r * cos(theta).toFloat()
+            val y = cy + r * sin(theta).toFloat()
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+        return Outline.Generic(path)
+    }
+}
+
+/**
+ * Material 3 Expressive Switch with tactile Pixel LRA haptics and a crisp check glyph inside the thumb.
+ */
+@Composable
+fun ExpressiveSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    checkedTrackColor: Color = MaterialTheme.colorScheme.primary,
+    checkedThumbColor: Color = MaterialTheme.colorScheme.onPrimary,
+    checkedIconColor: Color = MaterialTheme.colorScheme.primary,
+    uncheckedTrackColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    uncheckedThumbColor: Color = MaterialTheme.colorScheme.outline
+) {
+    val view = LocalView.current
+    Switch(
+        checked = checked,
+        onCheckedChange = { next ->
+            view.performHapticFeedback(
+                if (next) HapticFeedbackConstants.TOGGLE_ON else HapticFeedbackConstants.TOGGLE_OFF
+            )
+            onCheckedChange(next)
+        },
+        modifier = modifier,
+        thumbContent = if (checked) {
+            {
+                Icon(
+                    imageVector = AppIcons.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(SwitchDefaults.IconSize),
+                    tint = checkedIconColor
+                )
+            }
+        } else null,
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = checkedThumbColor,
+            checkedTrackColor = checkedTrackColor,
+            checkedBorderColor = Color.Transparent,
+            uncheckedThumbColor = uncheckedThumbColor,
+            uncheckedTrackColor = uncheckedTrackColor,
+            uncheckedBorderColor = MaterialTheme.colorScheme.outlineVariant
+        )
+    )
+}
+
+/**
  * Alarm: the clock hand makes one full lap every time the tab is selected.
  * Timer: the hourglass turns over and the sand falls through the neck on every selection.
- *
- * Each selection adds one step to a counter; the animated value follows the
- * counter. A switch that happens mid-animation therefore keeps going instead of
- * being cancelled, so the animation plays on every switch.
  */
 @Composable
 private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description: String) {
@@ -135,28 +244,26 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
         AppTab.ALARM -> {
             val sweep by animateFloatAsState(
                 targetValue = steps * 360f,
-                animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing),
+                animationSpec = tween(durationMillis = 650, easing = FastOutSlowInEasing),
                 label = "alarmSweep"
             )
             Canvas(
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(22.dp)
                     .semantics { contentDescription = description }
             ) {
-                val stroke = 2.2.dp.toPx()
+                val stroke = 2.1.dp.toPx()
                 val c = center
-                val radius = size.minDimension / 2f - 3.dp.toPx()
+                val radius = size.minDimension / 2f - 2.8.dp.toPx()
                 drawCircle(tint, radius = radius, center = c, style = Stroke(width = stroke))
-                // Little bells on top, like an alarm clock.
                 BELL_ANGLES.forEach { deg ->
                     val rad = Math.toRadians(deg.toDouble())
                     val p = Offset(
-                        c.x + ((radius + 1.5.dp.toPx()) * Math.cos(rad)).toFloat(),
-                        c.y + ((radius + 1.5.dp.toPx()) * Math.sin(rad)).toFloat()
+                        c.x + ((radius + 1.4.dp.toPx()) * cos(rad)).toFloat(),
+                        c.y + ((radius + 1.4.dp.toPx()) * sin(rad)).toFloat()
                     )
-                    drawCircle(tint, radius = 2.4.dp.toPx(), center = p)
+                    drawCircle(tint, radius = 2.2.dp.toPx(), center = p)
                 }
-                // Fixed short hand plus the long hand that makes the lap.
                 drawLine(tint, c, Offset(c.x + radius * 0.38f, c.y), strokeWidth = stroke, cap = StrokeCap.Round)
                 rotate(degrees = sweep - 90f, pivot = c) {
                     drawLine(tint, c, Offset(c.x + radius * 0.72f, c.y), strokeWidth = stroke, cap = StrokeCap.Round)
@@ -164,10 +271,9 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
             }
         }
         AppTab.TIMER -> {
-            // One step = half a turn of the glass, then the sand falls through the neck.
             val pos by animateFloatAsState(
                 targetValue = steps.toFloat(),
-                animationSpec = tween(durationMillis = 700, easing = LinearEasing),
+                animationSpec = tween(durationMillis = 650, easing = LinearEasing),
                 label = "hourglassPos"
             )
             val glassPath = remember { Path() }
@@ -175,7 +281,7 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
             val bottomSandPath = remember { Path() }
             Canvas(
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(22.dp)
                     .semantics { contentDescription = description }
             ) {
                 val u = size.minDimension / 24f
@@ -183,7 +289,6 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
                 val stroke = Stroke(width = 1.9f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
                 val pivot = pt(12f, 12f)
 
-                // Glass outline: two caps and the two bulbs meeting at the neck.
                 fun drawGlass() {
                     glassPath.reset()
                     glassPath.moveTo(pt(6f, 4f).x, pt(6f, 4f).y)
@@ -198,7 +303,6 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
                     drawLine(tint, pt(4f, 21.2f), pt(20f, 21.2f), strokeWidth = 2f * u, cap = StrokeCap.Round)
                 }
 
-                // Sand in the upper bulb: fills from the neck upwards, height h in 0..8.
                 fun drawTopSand(h: Float) {
                     if (h <= 0.01f) return
                     val y = 12f - h
@@ -211,7 +315,6 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
                     drawPath(topSandPath, tint)
                 }
 
-                // Sand in the lower bulb: fills from the bottom up, height h in 0..8.
                 fun drawBottomSand(h: Float) {
                     if (h <= 0.01f) return
                     val y = 20f - h
@@ -227,7 +330,6 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
 
                 val frac = pos - floor(pos)
                 if (frac < 0.5f) {
-                    // Turning: the glass and the sand in it rotate half a turn.
                     val t = frac / 0.5f
                     val delta = 180f * t * t * (3f - 2f * t)
                     rotate(degrees = delta, pivot = pivot) {
@@ -235,7 +337,6 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
                         drawBottomSand(8f)
                     }
                 } else {
-                    // Falling: sand drains from the upper bulb through the neck (accelerating).
                     val x = (frac - 0.5f) / 0.5f
                     val g = 1f - x * x
                     drawGlass()
@@ -255,66 +356,85 @@ private fun NavTabIcon(tab: AppTab, selected: Boolean, tint: Color, description:
         }
     }
 }
+
+/**
+ * Material 3 Expressive floating pill navigation dock.
+ * Both labels stay visible for zero layout shift; the selected tab lights up in secondaryContainer.
+ */
 @Composable
 fun ExpressiveNavBar(
     selectedTab: AppTab,
     onTabSelected: (AppTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    val colorScheme = MaterialTheme.colorScheme
+    val view = LocalView.current
+
+    Box(
         modifier = modifier
-            .padding(horizontal = 24.dp, vertical = 8.dp)
             .fillMaxWidth()
-            .height(56.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 24.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
     ) {
-        AppTab.entries.forEach { tab ->
-            val isSelected = selectedTab == tab
-            val containerColor by animateColorAsState(
-                targetValue = if (isSelected) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent,
-                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
-                label = "tabColor"
-            )
-            val contentColor by animateColorAsState(
-                targetValue = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium),
-                label = "tabTextColor"
-            )
-            val tabScale by animateFloatAsState(
-                targetValue = if (isSelected) 1f else 0.94f,
-                animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
-                label = "tabScale"
-            )
-            val tabTitle = stringResource(tab.titleRes)
-            Box(
+        Surface(
+            shape = RoundedCornerShape(32.dp),
+            color = colorScheme.surfaceContainer,
+            border = BorderStroke(1.dp, colorScheme.outlineVariant.copy(alpha = 0.28f)),
+            tonalElevation = 2.dp
+        ) {
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .scale(tabScale)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(containerColor)
-                    .clickable { onTabSelected(tab) },
-                contentAlignment = Alignment.Center
+                    .padding(6.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    NavTabIcon(
-                        tab = tab,
-                        selected = isSelected,
-                        tint = contentColor,
-                        description = tabTitle
+                AppTab.entries.forEach { tab ->
+                    val isSelected = selectedTab == tab
+                    val containerColor by animateColorAsState(
+                        targetValue = if (isSelected) colorScheme.secondaryContainer else Color.Transparent,
+                        animationSpec = ExpressiveMotion.fastEffects(),
+                        label = "tabContainer"
                     )
-                    if (isSelected) {
-                        Text(
-                            text = tabTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = contentColor,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
+                    val contentColor by animateColorAsState(
+                        targetValue = if (isSelected) colorScheme.onSecondaryContainer else colorScheme.onSurfaceVariant,
+                        animationSpec = ExpressiveMotion.fastEffects(),
+                        label = "tabContent"
+                    )
+                    val tabTitle = stringResource(tab.titleRes)
+
+                    Surface(
+                        shape = RoundedCornerShape(26.dp),
+                        color = containerColor,
+                        onClick = {
+                            if (!isSelected) {
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            }
+                            onTabSelected(tab)
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            NavTabIcon(
+                                tab = tab,
+                                selected = isSelected,
+                                tint = contentColor,
+                                description = tabTitle
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = tabTitle,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = contentColor
+                            )
+                        }
                     }
                 }
             }
@@ -323,8 +443,7 @@ fun ExpressiveNavBar(
 }
 
 /**
- * Same-window dialog with a strong predictive back: the card shrinks and
- * slides early in the gesture so the screen underneath is obvious.
+ * Same-window dialog with expressive spring entrance and Android 14+ predictive back animation.
  */
 @Composable
 fun PredictiveBackLayer(
@@ -357,7 +476,7 @@ fun PredictiveBackLayer(
                 progress.animateTo(
                     targetValue = 0f,
                     animationSpec = spring(
-                        dampingRatio = 0.62f,
+                        dampingRatio = 0.65f,
                         stiffness = Spring.StiffnessMedium
                     )
                 )
@@ -365,17 +484,16 @@ fun PredictiveBackLayer(
             }
         }
 
-        // Springy entrance: the card pops up from slightly smaller and slightly lower.
         val entrance = remember { Animatable(0f) }
         LaunchedEffect(Unit) {
             entrance.animateTo(
                 targetValue = 1f,
-                animationSpec = spring(dampingRatio = 0.68f, stiffness = Spring.StiffnessMediumLow)
+                animationSpec = spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow)
             )
         }
         val scrimClick = remember { MutableInteractionSource() }
         val cardClick = remember { MutableInteractionSource() }
-        val cardShape = remember { RoundedCornerShape(28.dp) }
+        val cardShape = remember { RoundedCornerShape(32.dp) }
 
         Box(
             modifier = Modifier
@@ -383,7 +501,7 @@ fun PredictiveBackLayer(
                 .drawBehind {
                     val raw = progress.value
                     val emphasized = 1f - (1f - raw) * (1f - raw)
-                    val scrimAlpha = 0.62f * (1f - emphasized * 1.4f).coerceIn(0f, 1f) * entrance.value.coerceIn(0f, 1f)
+                    val scrimAlpha = 0.64f * (1f - emphasized * 1.4f).coerceIn(0f, 1f) * entrance.value.coerceIn(0f, 1f)
                     drawRect(Color.Black.copy(alpha = scrimAlpha))
                 }
                 .clickable(interactionSource = scrimClick, indication = null, onClick = onDismiss),
@@ -397,12 +515,12 @@ fun PredictiveBackLayer(
                         val raw = progress.value
                         val emphasized = 1f - (1f - raw) * (1f - raw)
                         val pop = entrance.value
-                        val scale = (0.86f + 0.14f * pop) - 0.38f * emphasized
+                        val scale = (0.88f + 0.12f * pop) - 0.32f * emphasized
                         scaleX = scale
                         scaleY = scale
-                        translationX = (if (fromLeft) 120.dp else (-120).dp).toPx() * emphasized
-                        translationY = 72.dp.toPx() * emphasized + 56.dp.toPx() * (1f - pop)
-                        alpha = (pop.coerceIn(0f, 1f)) * (1f - 0.2f * emphasized)
+                        translationX = (if (fromLeft) 110.dp else (-110).dp).toPx() * emphasized
+                        translationY = 64.dp.toPx() * emphasized + 44.dp.toPx() * (1f - pop)
+                        alpha = (pop.coerceIn(0f, 1f)) * (1f - 0.18f * emphasized)
                         shape = cardShape
                         clip = true
                     }
@@ -428,54 +546,6 @@ fun autoFocusModifier(): Modifier {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KeyboardTimeFields(state: TimePickerState) {
-    var hourText by remember { mutableStateOf(state.hour.toString().padStart(2, '0')) }
-    var minuteText by remember { mutableStateOf(state.minute.toString().padStart(2, '0')) }
-    val focusModifier = autoFocusModifier()
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
-            value = hourText,
-            onValueChange = { raw ->
-                val digits = raw.filter { it.isDigit() }.take(2)
-                hourText = digits
-                digits.toIntOrNull()?.takeIf { it in 0..23 }?.let { state.hour = it }
-            },
-            singleLine = true,
-            textStyle = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            ),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = focusModifier.width(96.dp),
-            shape = RoundedCornerShape(18.dp)
-        )
-        Text(
-            text = ":",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 8.dp)
-        )
-        OutlinedTextField(
-            value = minuteText,
-            onValueChange = { raw ->
-                val digits = raw.filter { it.isDigit() }.take(2)
-                minuteText = digits
-                digits.toIntOrNull()?.takeIf { it in 0..59 }?.let { state.minute = it }
-            },
-            singleLine = true,
-            textStyle = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            ),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.width(96.dp),
-            shape = RoundedCornerShape(18.dp)
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 fun ExpressiveTimePickerDialog(
     initialHour: Int = 7,
     initialMinute: Int = 0,
@@ -488,44 +558,46 @@ fun ExpressiveTimePickerDialog(
         initialMinute = initialMinute,
         is24Hour = is24Hour
     )
-    // Default to clock menu (dial), not keyboard
     var isKeyboardMode by remember { mutableStateOf(false) }
+    val colorScheme = MaterialTheme.colorScheme
 
     PredictiveBackLayer(onDismiss = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(32.dp),
+            color = colorScheme.surfaceContainerHigh,
             modifier = Modifier
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth()
         ) {
             Column(
                 modifier = Modifier
-                    .padding(horizontal = 20.dp, vertical = 20.dp)
+                    .padding(horizontal = 24.dp, vertical = 22.dp)
                     .imePadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp),
+                        .padding(bottom = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = stringResource(R.string.select_time),
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = colorScheme.onSurface
                     )
-                    IconButton(
+                    FilledTonalIconButton(
                         onClick = { isKeyboardMode = !isKeyboardMode },
-                        modifier = Modifier.size(40.dp)
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = colorScheme.secondaryContainer,
+                            contentColor = colorScheme.onSecondaryContainer
+                        )
                     ) {
                         Icon(
                             imageVector = if (isKeyboardMode) AppIcons.Schedule else AppIcons.Keyboard,
                             contentDescription = stringResource(R.string.toggle_mode),
-                            tint = MaterialTheme.colorScheme.onSurface
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -534,25 +606,25 @@ fun ExpressiveTimePickerDialog(
                     TimeInput(
                         state = timePickerState,
                         colors = TimePickerDefaults.colors(
-                            timeSelectorSelectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            timeSelectorSelectedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            timeSelectorUnselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            timeSelectorUnselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            timeSelectorSelectedContainerColor = colorScheme.primaryContainer,
+                            timeSelectorSelectedContentColor = colorScheme.onPrimaryContainer,
+                            timeSelectorUnselectedContainerColor = colorScheme.surfaceContainerHighest,
+                            timeSelectorUnselectedContentColor = colorScheme.onSurfaceVariant
                         )
                     )
                 } else {
                     TimePicker(
                         state = timePickerState,
                         colors = TimePickerDefaults.colors(
-                            clockDialColor = MaterialTheme.colorScheme.surfaceContainer,
-                            selectorColor = MaterialTheme.colorScheme.primary,
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            clockDialSelectedContentColor = MaterialTheme.colorScheme.onPrimary,
-                            clockDialUnselectedContentColor = MaterialTheme.colorScheme.onSurface,
-                            timeSelectorSelectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            timeSelectorSelectedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            timeSelectorUnselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            timeSelectorUnselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            clockDialColor = colorScheme.surfaceContainer,
+                            selectorColor = colorScheme.primary,
+                            containerColor = colorScheme.surfaceContainerHigh,
+                            clockDialSelectedContentColor = colorScheme.onPrimary,
+                            clockDialUnselectedContentColor = colorScheme.onSurface,
+                            timeSelectorSelectedContainerColor = colorScheme.primaryContainer,
+                            timeSelectorSelectedContentColor = colorScheme.onPrimaryContainer,
+                            timeSelectorUnselectedContainerColor = colorScheme.surfaceContainerHighest,
+                            timeSelectorUnselectedContentColor = colorScheme.onSurfaceVariant
                         )
                     )
                 }
@@ -560,27 +632,25 @@ fun ExpressiveTimePickerDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                        .padding(top = 18.dp),
+                    horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss, shape = RoundedCornerShape(18.dp)) {
+                    TextButton(onClick = onDismiss) {
                         Text(
-                            stringResource(R.string.cancel),
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = stringResource(R.string.cancel),
+                            style = MaterialTheme.typography.labelLarge
                         )
                     }
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        onClick = { onConfirm(timePickerState.hour, timePickerState.minute) }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { onConfirm(timePickerState.hour, timePickerState.minute) },
+                        shape = RoundedCornerShape(20.dp)
                     ) {
                         Text(
-                            stringResource(R.string.save),
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp)
+                            text = stringResource(R.string.save),
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                         )
                     }
                 }
@@ -601,7 +671,7 @@ fun ExpressiveDatePickerDialog(
     )
     PredictiveBackLayer(onDismiss = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             modifier = Modifier
                 .padding(horizontal = 12.dp)
@@ -612,13 +682,13 @@ fun ExpressiveDatePickerDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = onDismiss, shape = RoundedCornerShape(18.dp)) {
-                        Text(stringResource(R.string.cancel), fontWeight = FontWeight.SemiBold)
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.cancel))
                     }
-                    Spacer(modifier = Modifier.size(8.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
                             datePickerState.selectedDateMillis?.let { millis ->
@@ -629,9 +699,9 @@ fun ExpressiveDatePickerDialog(
                             }
                             onDismiss()
                         },
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(20.dp)
                     ) {
-                        Text(stringResource(R.string.save), fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.save))
                     }
                 }
             }
@@ -667,12 +737,11 @@ fun ExpressiveDateRangePickerDialog(
         }
     )
     val startMillis = state.selectedStartDateMillis
-    // One tap = one paused day. A second tap makes it a range.
     val endMillis = state.selectedEndDateMillis ?: startMillis
 
     PredictiveBackLayer(onDismiss = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             modifier = Modifier
                 .padding(horizontal = 12.dp)
@@ -682,8 +751,7 @@ fun ExpressiveDateRangePickerDialog(
                 Text(
                     text = stringResource(R.string.pause_title),
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp)
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 22.dp)
                 )
                 Text(
                     text = stringResource(R.string.pause_hint),
@@ -697,12 +765,12 @@ fun ExpressiveDateRangePickerDialog(
                     showModeToggle = false,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(460.dp)
+                        .height(450.dp)
                 )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -711,17 +779,16 @@ fun ExpressiveDateRangePickerDialog(
                             onClick = {
                                 onClear()
                                 onDismiss()
-                            },
-                            shape = RoundedCornerShape(18.dp)
+                            }
                         ) {
-                            Text(stringResource(R.string.pause_resume), fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.pause_resume))
                         }
                         Spacer(modifier = Modifier.weight(1f))
                     }
-                    TextButton(onClick = onDismiss, shape = RoundedCornerShape(18.dp)) {
-                        Text(stringResource(R.string.cancel), fontWeight = FontWeight.SemiBold)
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.cancel))
                     }
-                    Spacer(modifier = Modifier.size(8.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         enabled = startMillis != null,
                         onClick = {
@@ -730,9 +797,9 @@ fun ExpressiveDateRangePickerDialog(
                             }
                             onDismiss()
                         },
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(20.dp)
                     ) {
-                        Text(stringResource(R.string.save), fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.save))
                     }
                 }
             }

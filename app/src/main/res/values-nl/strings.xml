@@ -98,4 +98,11 @@
 
     <string name="today">Vandaag</string>
     <string name="tomorrow">Morgen</string>
+
+    <string name="backup_export">Wekkers exporteren (JSON)</string>
+    <string name="backup_import">Wekkers importeren (JSON)</string>
+    <string name="backup_exported">Wekkers geëxporteerd</string>
+    <string name="backup_imported">%1$d wekkers geïmporteerd</string>
+    <string name="backup_failed">Kan back-upbestand niet lezen</string>
+    <string name="more_options">Meer opties</string>
 </resources>

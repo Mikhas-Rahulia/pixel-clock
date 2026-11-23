@@ -1,9 +1,7 @@
 package io.github.mikhasrahulia.pixelclock.ui.main
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -31,6 +29,7 @@ import io.github.mikhasrahulia.pixelclock.ui.components.AppTab
 import io.github.mikhasrahulia.pixelclock.ui.components.ExpressiveNavBar
 import io.github.mikhasrahulia.pixelclock.ui.components.LocalModalGate
 import io.github.mikhasrahulia.pixelclock.ui.components.ModalGate
+import io.github.mikhasrahulia.pixelclock.ui.theme.ExpressiveMotion
 import io.github.mikhasrahulia.pixelclock.ui.timer.TimerScreen
 
 @Composable
@@ -44,7 +43,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
 
     val navBarAlpha by animateFloatAsState(
         targetValue = if (gate.depth == 0) 1f else 0f,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        animationSpec = ExpressiveMotion.fastEffects(),
         label = "navBarAlpha"
     )
 
@@ -61,16 +60,12 @@ fun MainScreen(modifier: Modifier = Modifier) {
                     .fillMaxWidth(),
                 transitionSpec = {
                     val forward = targetState.ordinal > initialState.ordinal
-                    val enter = slideInHorizontally(
-                        spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMedium)
-                    ) { full -> if (forward) full / 5 else -full / 5 } + fadeIn(
-                        spring(stiffness = Spring.StiffnessMedium)
-                    )
-                    val exit = slideOutHorizontally(
-                        spring(stiffness = Spring.StiffnessMedium)
-                    ) { full -> if (forward) -full / 6 else full / 6 } + fadeOut(
-                        spring(stiffness = Spring.StiffnessMedium)
-                    )
+                    val enter = slideInHorizontally(ExpressiveMotion.defaultSpatial()) { full ->
+                        if (forward) full / 6 else -full / 6
+                    } + fadeIn(ExpressiveMotion.fastEffects())
+                    val exit = slideOutHorizontally(ExpressiveMotion.defaultSpatial()) { full ->
+                        if (forward) -full / 8 else full / 8
+                    } + fadeOut(ExpressiveMotion.fastEffects())
                     enter togetherWith exit
                 },
                 label = "tab"
@@ -87,7 +82,6 @@ fun MainScreen(modifier: Modifier = Modifier) {
                     )
                 }
             }
-            // Keep ExpressiveNavBar in layout to prevent background reflow during predictive back
             ExpressiveNavBar(
                 selectedTab = selectedTab,
                 onTabSelected = { if (gate.depth == 0) selectedTab = it },

@@ -5,12 +5,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -29,7 +31,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,7 +47,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,11 +59,14 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import io.github.mikhasrahulia.pixelclock.R
 import io.github.mikhasrahulia.pixelclock.ui.components.AppIcons
+import io.github.mikhasrahulia.pixelclock.ui.components.ScallopedShape
 import io.github.mikhasrahulia.pixelclock.ui.theme.PixelClockTheme
 import kotlinx.coroutines.delay
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+private val AlarmRingingBadgeShape = ScallopedShape(lobes = 12, depthFraction = 0.085f)
 
 class AlarmRingingActivity : ComponentActivity() {
     private var alarmIdState by mutableStateOf("")
@@ -145,6 +152,7 @@ private fun AlarmRingingScreen(
     onSnooze: () -> Unit
 ) {
     BackHandler { /* Prevent back gesture from hiding UI while alarm keeps ringing */ }
+    val view = LocalView.current
 
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
     LaunchedEffect(Unit) {
@@ -157,15 +165,24 @@ private fun AlarmRingingScreen(
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()) }
     val secondsFormatter = remember { DateTimeFormatter.ofPattern(":ss", Locale.getDefault()) }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val infiniteTransition = rememberInfiniteTransition(label = "alarmExpressive")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.94f,
-        targetValue = 1.06f,
+        targetValue = 1.07f,
         animationSpec = infiniteRepeatable(
             animation = tween(900, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "scale"
+    )
+    val badgeRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(18_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
     )
 
     Column(
@@ -182,17 +199,22 @@ private fun AlarmRingingScreen(
             modifier = Modifier.padding(top = 36.dp)
         ) {
             Box(
-                modifier = Modifier
-                    .size(92.dp)
-                    .scale(pulseScale)
-                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                modifier = Modifier.size(112.dp),
                 contentAlignment = Alignment.Center
             ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .scale(pulseScale)
+                        .rotate(badgeRotation)
+                        .clip(AlarmRingingBadgeShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                )
                 Icon(
                     imageVector = AppIcons.Alarm,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(44.dp)
+                    modifier = Modifier.size(46.dp)
                 )
             }
 
@@ -201,7 +223,6 @@ private fun AlarmRingingScreen(
             Text(
                 text = label.ifBlank { stringResource(R.string.tab_alarm) },
                 style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )
@@ -214,15 +235,15 @@ private fun AlarmRingingScreen(
             Text(
                 text = currentTime.format(timeFormatter),
                 style = MaterialTheme.typography.displayLarge.copy(
-                    fontSize = 84.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontSize = 86.sp,
+                    lineHeight = 90.sp,
                     letterSpacing = (-2).sp
                 ),
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
                 text = currentTime.format(secondsFormatter),
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineSmall.copy(fontFeatureSettings = "tnum"),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 14.dp)
             )
@@ -233,11 +254,14 @@ private fun AlarmRingingScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Button(
-                onClick = onDismiss,
+                onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    onDismiss()
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(68.dp),
-                shape = RoundedCornerShape(34.dp),
+                    .height(72.dp),
+                shape = RoundedCornerShape(36.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
@@ -259,11 +283,18 @@ private fun AlarmRingingScreen(
             Spacer(modifier = Modifier.height(14.dp))
 
             FilledTonalButton(
-                onClick = onSnooze,
+                onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    onSnooze()
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(58.dp),
-                shape = RoundedCornerShape(29.dp)
+                    .height(60.dp),
+                shape = RoundedCornerShape(30.dp),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
             ) {
                 Icon(
                     imageVector = AppIcons.Snooze,

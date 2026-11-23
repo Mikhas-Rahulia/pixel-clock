@@ -98,4 +98,11 @@
 
     <string name="today">Сегодня</string>
     <string name="tomorrow">Завтра</string>
+
+    <string name="backup_export">Экспорт будильников (JSON)</string>
+    <string name="backup_import">Импорт будильников (JSON)</string>
+    <string name="backup_exported">Будильники экспортированы</string>
+    <string name="backup_imported">Импортировано будильников: %1$d</string>
+    <string name="backup_failed">Не удалось прочитать файл резервной копии</string>
+    <string name="more_options">Ещё</string>
 </resources>

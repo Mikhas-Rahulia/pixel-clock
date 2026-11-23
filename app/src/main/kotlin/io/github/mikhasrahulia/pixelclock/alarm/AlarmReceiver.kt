@@ -51,6 +51,7 @@ class AlarmReceiver : BroadcastReceiver() {
                             .scheduleAlarm(alarm, from = LocalDateTime.now().plusMinutes(1))
                     } else {
                         repository.toggleAlarm(alarmId, false)
+                        repository.flushBlocking()
                     }
                 }
             }

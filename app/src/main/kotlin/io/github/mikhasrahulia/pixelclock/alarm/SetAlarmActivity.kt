@@ -80,6 +80,7 @@ class SetAlarmActivity : Activity() {
         if (duplicate) return true
 
         repository.addAlarm(candidate)
+        repository.flushBlocking()
         AlarmScheduler.getInstance(this).scheduleAlarm(candidate)
         return true
     }

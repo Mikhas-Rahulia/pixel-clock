@@ -98,4 +98,11 @@
 
     <string name="today">Dzisiaj</string>
     <string name="tomorrow">Jutro</string>
+
+    <string name="backup_export">Eksportuj budziki (JSON)</string>
+    <string name="backup_import">Importuj budziki (JSON)</string>
+    <string name="backup_exported">Wyeksportowano budziki</string>
+    <string name="backup_imported">Zaimportowano budzików: %1$d</string>
+    <string name="backup_failed">Nie udało się odczytać pliku kopii</string>
+    <string name="more_options">Więcej opcji</string>
 </resources>

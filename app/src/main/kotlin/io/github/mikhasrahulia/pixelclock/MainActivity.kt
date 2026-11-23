@@ -13,6 +13,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import io.github.mikhasrahulia.pixelclock.alarm.AlarmScheduler
+import io.github.mikhasrahulia.pixelclock.data.AlarmRepository
 import io.github.mikhasrahulia.pixelclock.timer.TimerManager
 import io.github.mikhasrahulia.pixelclock.ui.main.MainScreen
 import io.github.mikhasrahulia.pixelclock.ui.theme.PixelClockTheme
@@ -38,6 +39,7 @@ class MainActivity : ComponentActivity() {
         // Offload cold-start alarm/timer reconciliation off the main thread for instant TTID
         val appContext = applicationContext
         backgroundScope.launch {
+            AlarmRepository.getInstance(appContext).ensureLoadedAndMigrated()
             AlarmScheduler.getInstance(appContext).rescheduleAllAlarms()
             TimerManager.getInstance(appContext).reconcile()
         }
@@ -51,6 +53,14 @@ class MainActivity : ComponentActivity() {
                     MainScreen()
                 }
             }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        val appContext = applicationContext
+        backgroundScope.launch {
+            AlarmRepository.getInstance(appContext).flushBlocking()
         }
     }
 

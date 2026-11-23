@@ -98,4 +98,11 @@
 
     <string name="today">Hoy</string>
     <string name="tomorrow">Mañana</string>
+
+    <string name="backup_export">Exportar alarmas (JSON)</string>
+    <string name="backup_import">Importar alarmas (JSON)</string>
+    <string name="backup_exported">Alarmas exportadas</string>
+    <string name="backup_imported">%1$d alarmas importadas</string>
+    <string name="backup_failed">No se pudo leer la copia de seguridad</string>
+    <string name="more_options">Más opciones</string>
 </resources>
